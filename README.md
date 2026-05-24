@@ -1,7 +1,7 @@
 # EFHW (End-Fed Half-Wave) 天线知识库
 
 > BG1SB 的 EFHW 天线技术参考知识库
-> 最后更新: 2026-05-25
+> 最后更新: 2026-05-25 (新增 AA5TB 耦合器 + VA3KOT CFHW 分析)
 
 ---
 
@@ -212,6 +212,65 @@ Counterpoise：80m → 4m 独立地线
 - ⚠ **产品一致性未知** — 横店东磁是正规大厂，但未提供 RF 应用的批次一致性数据
 - ✅ **磁芯饱和不是瓶颈** — 100W 时 B 仅 9.2 mT，远低于 Bs(~350 mT)
 - ✅ **温升安全** — 最恶劣条件（80m FT8 连续）温升 < 22°C
+
+### AA5TB 并联 L-C 耦合器：铁氧体变压器的替代方案 🆕
+
+> 来源：VA3KOT 实验验证 (2026-02-04)，基于 Steve AA5TB 原始设计
+
+#### 原理
+
+传统 49:1 使用**宽带铁氧体变压器**在多个频段同时工作。AA5TB 耦合器采用**并联谐振电路**：电感和电容并联，在每个频段单独调谐到谐振。匝数比仍是 7:1（49:1 阻抗），但磁芯改为**羰基铁粉芯 (Type 2 powdered iron)**。
+
+| 对比项 | 49:1 铁氧体变压器 | AA5TB 并联 L-C 耦合器 |
+|--------|-------------------|---------------------|
+| 磁芯 | Mn-Zn/Ni-Zn 铁氧体 | **羰基铁粉芯 (Type 2)** |
+| 带宽 | 宽带（无需调谐） | **窄带（每频段需调谐）** |
+| 磁芯损耗 | 频率上升损耗增大 | **极低（粉末铁芯高频特性极好）** |
+| 制作难度 | 绕线即可，无需调谐 | 需要可变电容器调谐 |
+| 80m 能力 | 差（电感不足） | 有限（VA3KOT 未成功） |
+| 40-20m 能力 | 良好 | ✅ SWR<1.5:1, X=0 谐振 |
+| 15-10m 能力 | 寄生电容恶化 | 可调谐到 SWR<1.5:1 |
+
+#### VA3KOT 实验验证 (2026-02-04)
+
+```
+磁芯：羰基铁粉 Type 2 环
+初级：3T（接 BNC → 50Ω）
+次级：19T（接天线 + Counterpoise）
+匝数比：3:19 ≈ 1:6.3（接近 7:1 = 49:1）
+并联电容：16-160pF 薄膜可变电容 (polyvaricon)
+并联电阻：2.7kΩ（模拟 EFHW 阻抗，实际使用时移除）
+```
+
+**实测结果**：
+- 40m/30m/20m：可调谐到 **X=0（谐振）**，SWR < 1.5:1
+- 17m/15m/12m/10m：可调谐到 SWR < 1.5:1，X 接近 0
+- 80m：无法调谐
+- 线圈是临时绕制的丑陋版本——**但效果已经很好**
+
+> 「看起来只值一块钱——但它能用！」— VA3KOT
+
+#### 为什么粉末铁芯可能优于铁氧体
+
+| 特性 | 羰基铁粉 (Type 2) | Mn-Zn 铁氧体 (Mix 43) |
+|------|-------------------|---------------------|
+| μ | 10 | 850 |
+| 频率上限 | >100 MHz | ~50 MHz |
+| 磁芯损耗 @ 30MHz | **极低** | 显著 |
+| 温度稳定性 | 优秀 | 一般 |
+| AL (nH/N²) | ~10-20 | ~1000 |
+| 需要匝数 (7:1) | 多匝（3T/21T 级别） | 少匝（2T/14T） |
+
+> 粉末铁芯的 μ 低 85 倍 → 需要更多匝数达到相同电感 → 但高频损耗极低。这是「牺牲便利性换效率」的思路。
+
+#### 缺点
+
+- **每换频段需重新调谐** — 对 contesting / multi-band 不友好
+- **FT8 多波段跳频时需要手动调整**
+- 可变电容器体积大、不如固定变压器紧凑
+- **BG1SB 场景**：如果固定在某几个 FT8 频段（如 40m/20m），调谐一次即可——实际影响不大
+
+> 📄 VA3KOT 衍生文章：CFHW (2026-03-04) — 确认 EFHW 仅基波+二次谐波有效，多波段 EFHW 是营销。见参考链接。
 
 ---
 
@@ -513,12 +572,11 @@ L-Network 由一个串联电感(L)和一个并联电容(C)组成，替代 49:1 �
 | 标题 | 来源 | 日期 | 链接 |
 |------|------|------|------|
 | **🆕 EFHW 深度研究与工程设计建议** | **BG1SB / Hermes** | **2026-05-25** | **`references/deep-dive-2026-05-25.md`** |
-| **🆕 Endfed Antennas, QRM, and How to Improve RX** | **PA9X (Jean-Paul)** | **2025-08-27** | **pa9x.com** |
-| **🆕 The CFHW — EFHW vs Dipole for Portable Ops** | **VA3KOT (John)** | **2026-03-04** | **hamradiooutsidethebox.ca** |
 |------|------|------|------|
 | EFHW matching: 49:1 or L-Network? | VA3KOT, Ham Radio Outside the Box | 2025-04-30 | hamradiooutsidethebox.ca |
 | Why 49:1 EFHW is a Fantasy on 80-10m | ON6URE, RF.Guru | 2026 | shop.rf.guru |
 | Boost Your End Fed with Proper Counterpoise | PA9X | 2025-05-03 | pa9x.com |
+| Endfed Antennas, QRM, and How to Improve RX | PA9X | 2025-08-27 | pa9x.com |
 | End Fed Half Wave Wire Antennas (深度批判) | N6CC (Tim) | 2026-03-13 更新 | n6cc.com |
 | Toroid Balun Winding (分绕法神话揭穿) | W8JI (Tom) | - | w8ji.com |
 | EFHW NEC models for 20m | Owen Duffy | 2024-10 | owenduffy.net |
@@ -528,6 +586,8 @@ L-Network 由一个串联电感(L)和一个并联电容(C)组成，替代 49:1 �
 | DIY 64:1 Linked EFHW | KM1NDY | 2022-08 | km1ndy.com |
 | EFHW 49:1 UNUN DIY | KM1NDY | 2022-02 | km1ndy.com |
 | **DMEGC Ni-Zn 磁环 EFHW 工程分析** 🆕 | **BG1SB / Hermes** | **2026-05-24** | **`references/dmegc_nizn_toroid.md`** |
+| **🆕 The CFHW — EFHW vs Dipole for Portable Ops** | **VA3KOT (John)** | **2026-03-04** | **hamradiooutsidethebox.ca** |
+| **🆕 AA5TB Parallel L-C EFHW Coupler 实验** | **VA3KOT (John)** | **2026-02-04** | **hamradiooutsidethebox.ca** |
 
 ### 经典参考
 
