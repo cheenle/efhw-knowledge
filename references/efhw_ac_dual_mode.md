@@ -119,6 +119,8 @@ A+C 方案正确地识别了这个问题，并提出分频段用不同磁芯材�
 
 ### 2.3 AA5TB 并联谐振 LC 耦合器的工程原理
 
+> 📄 **完整参考**: [[aa5tb_efha_analysis]] — AA5TB 原始理论体系全解 (MININEC, 0.05λ 法则, Moxon 等效, 台架调谐法, 演化谱系)
+
 AA5TB (Steve Yates) 的原始设计利用了并联谐振电路的阻抗变换特性：
 
 ```
@@ -379,7 +381,7 @@ Phase 4 (长期):
 | # | 来源 | 核心贡献 |
 |---|------|---------|
 | 1 | [EFHW A+C 工程指南](https://r3cb2mze.mule.page/) | 完整系统设计、制作步骤、测试流程 |
-| 2 | AA5TB (Steve Yates) | 并联谐振 LC 耦合器原始设计 |
+| 2 | AA5TB (Steve Yates) | 并联谐振 LC 耦合器原始设计 → [[aa5tb_efha_analysis]] |
 | 3 | VA3KOT (John) | T200-2 实验验证、多波段测试数据 |
 | 4 | PA3HHO | 2×FT240-43 (3:21) 损耗实测 |
 | 5 | W8JI (Tom Rauch) | 并绕法实测、EFHW 匹配效率分析 |

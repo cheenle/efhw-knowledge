@@ -216,6 +216,8 @@ Counterpoise：80m → 4m 独立地线
 ### AA5TB 并联 L-C 耦合器：铁氧体变压器的替代方案 🆕
 
 > 来源：VA3KOT 实验验证 (2026-02-04)，基于 Steve AA5TB 原始设计
+> 📄 **完整分析**：[`references/aa5tb_efha_analysis.md`](references/aa5tb_efha_analysis.md) — AA5TB 原始理论体系深度解析 (MININEC 建模, 0.05λ counterpoise 法则, 台架调谐方法论, Moxon 平衡模型, 演化谱系, 工程限制)
+> 🔗 原始页面：https://www.aa5tb.com/efha.html
 
 #### 原理
 
@@ -630,6 +632,7 @@ Phase 4 (长期): 户外可靠性验证
 
 | 标题 | 来源 | 日期 | 链接 |
 |------|------|------|------|
+| **🆕 AA5TB EFHA 原始理论体系深度解析** | **BG1SB** | **2026-06-06** | **`references/aa5tb_efha_analysis.md`** |
 | **🆕 EFHW A+C 双模匹配系统深度分析** | **BG1SB** | **2026-06-06** | **`references/efhw_ac_dual_mode.md`** |
 | **🆕 EFHW 深度研究与工程设计建议** | **BG1SB / Hermes** | **2026-05-25** | **`references/deep-dive-2026-05-25.md`** |
 |------|------|------|------|
