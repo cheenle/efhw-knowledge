@@ -42,7 +42,15 @@ auto-efhw-tuner/
 │   └── Makefile                 ← 编译配置参考
 ├── hardware/                    ← 硬件设计文件
 │   ├── EFHW_TUNER_BOM.csv       ← 完整BOM (带立创商城编号)
-│   └── KiCad_schematic_guide.md  ← KiCad 原理图/PCB 设计指南
+│   ├── KiCad_schematic_guide.md  ← KiCad 原理图/PCB 设计指南
+│   └── simulation/              ← 🆕 SPICE 电路仿真 + PCB 传输线 + 热分析
+│       ├── README.md            ← 仿真环境配置 + 验证清单
+│       ├── swr_bridge_spice.cir ← Tandem Match 定向耦合器 (S参数)
+│       ├── lc_resonant_tank.cir ← T200-2 并联LC谐振回路 (Q/V_peak/f_res)
+│       ├── bias_tee_spice.cir   ← Bias-T 同轴馈电 (S21/隔离/SRF)
+│       ├── relay_driver_spice.cir ← ULN2003A继电器驱动 (反峰/瞬态)
+│       ├── pcb_transmission_lines.md ← PCB 传输线/过孔/寄生参数
+│       └── thermal_analysis.md  ← 热仿真 (6热源温升/CFD边界条件)
 ├── docs/                        ← 工程文档
 │   ├── SDD.md                   ← 🆕 软件设计文档 (架构/接口/状态机/时序)
 │   ├── FDE.md                   ← 🆕 故障检测与消除 (FMEA/POST/降级/故障注入)
