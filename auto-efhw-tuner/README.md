@@ -42,8 +42,10 @@ auto-efhw-tuner/
 │   └── Makefile                 ← 编译配置参考
 ├── hardware/                    ← 硬件设计文件
 │   ├── EFHW_TUNER_BOM.csv       ← 完整BOM (带立创商城编号)
+│   ├── SCH_Description.md        ← 🆕 原理图描述 (9节, Netlist级)
+│   ├── PCB_Description.md        ← 🆕 PCB布局描述 (8节, 坐标级)
 │   ├── KiCad_schematic_guide.md  ← KiCad 原理图/PCB 设计指南
-│   └── simulation/              ← 🆕 SPICE 电路仿真 + PCB 传输线 + 热分析
+│   └── simulation/              ← SPICE 电路仿真 + PCB 传输线 + 热分析
 │       ├── README.md            ← 仿真环境配置 + 验证清单
 │       ├── swr_bridge_spice.cir ← Tandem Match 定向耦合器 (S参数)
 │       ├── lc_resonant_tank.cir ← T200-2 并联LC谐振回路 (Q/V_peak/f_res)
