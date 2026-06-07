@@ -1,7 +1,7 @@
 # EFHW (End-Fed Half-Wave) 天线知识库
 
 > BG1SB 的 EFHW 天线技术参考知识库
-> 最后更新: 2026-06-06 (新增 A+C 双模匹配系统深度分析)
+> 最后更新: 2026-06-07 (新增 100W 全自动谐振式 EFHW 调谐适配器完整工程设计)
 
 ---
 
@@ -18,6 +18,7 @@
 9. [NEC 建模与辐射特性](#8-nec-建模与辐射特性)
 10. [DIY 制作指南](#9-diy-制作指南)
 11. [🆕 A+C 双模匹配系统 — 高低波段兼顾新方向](#11-ac-双模匹配系统)
+12. [🆕 100W 全自动谐振式 EFHW 调谐适配器 — 完整工程设计](#12-100w-全自动谐振式-efhw-调谐适配器)
 
 ---
 
@@ -626,6 +627,62 @@ Phase 4 (长期): 户外可靠性验证
 
 ---
 
+## 12. 🆕 100W 全自动谐振式 EFHW 调谐适配器 — 完整工程设计
+
+> 📄 **完整设计文档**：[`references/auto_efhw_tuner_design_full.md`](references/auto_efhw_tuner_design_full.md)
+> 许可：GPL-3.0 (固件) / CERN-OHL-S 2.0 (硬件)
+> 关联：[[aa5tb_efha_analysis]] · [[efhw_ac_dual_mode]] · [[deep-dive-2026-05-25]]
+
+### 项目概述
+
+基于 AA5TB 并联 LC 耦合器理论与 N7DDC ATU-100 开源框架，设计一台**室外架设、同轴馈电、全自动调谐**的 100W EFHW 天线适配器。
+
+### 核心技术数据
+
+| 参数 | 值 |
+|------|-----|
+| 频率范围 | 40m–10m (7.0–29.7 MHz) |
+| 额定功率 | 100W PEP SSB/CW |
+| 磁芯方案 | **T200-2 ×2 双叠** (羰基铁粉, μ=10) |
+| 匝数比 | **2:13** → 42.25:1 阻抗比 → 匹配 ~2,112 Ω |
+| 调谐方式 | **7 位 128 档纯电容扫描** (10–1,997 pF, 1pF 步进) |
+| 调谐时间 | <0.2s (记忆重新调) / <2s (全扫描) |
+| 电容阵列 | 10 只 **1812 / 3KV / C0G(NPO)** 高压贴片 MLCC |
+| 继电器 | 7 × **Omron G5Q-14** (触点间耐压 2KV) |
+| SWR 检测 | Tandem Match 定向耦合器 (FT37-43 + BAT41) |
+| 供电 | **Bias-T 同轴馈电** 12V DC (无独立电源线) |
+| PCB | 140×90mm 双面板, **2.5mm 物理开槽**隔离高低压 |
+| 防护 | IP66 压铸铝壳 + 90V GDT 避雷 + 2.2MΩ 静电泄放 |
+
+### 关键工程创新
+
+1. **纯电容调谐**：废除 ATU-100 原电感扫描，7个继电器全部控制电容 → 128 档电容矩阵，调谐精度远超传统 L/C 二维扫描
+2. **T200-2 100W 安全验证**：最严条件 (40m/100W) B_peak = 5.6 mT → 距 B_sat (800 mT) **143 倍裕度**，完全不可能饱和
+3. **物理挖槽防爬电**：PCB 中线 2.5mm×115mm 透空槽切断 FR4 表面寄生电容的 3KV RF 高压爬电路径
+4. **高压电容并联均流**：大容量位(C6/C7)强制多只并联，应对谐振环流 2.6A RMS
+5. **固件热切换保护**：功率 > 15W 自动中断调谐 → 保护继电器触点不被 RF 电弧烧毁
+
+### 开源项目范围
+
+- ✅ 完整电气原理图 (Netlist 级)
+- ✅ PCB 布局规范与 DRC 强制性约束
+- ✅ 固件源码 (C语言, 基于 N7DDC ATU-100 修改, 含完整调谐算法)
+- ✅ **SDD 软件设计文档** (分层架构/模块接口/状态机/时序分析/内存映射)
+- ✅ **FDE 故障检测与消除文档** (23组件+12函数FMEA/POST/降级/故障注入)
+- ✅ **运行时诊断固件模块** (GPIO回读验证/ADC卡死检测/继电器健康监测/健康状态机)
+- ✅ **4阶段POST上电自检** (DC电源/核心/外设/RF路径 + WDT/BOR恢复)
+- ✅ 全 BOM 物料清单 (总成本 ~¥375/套)
+- ✅ 室外耐候性工程方案 (呼吸排水孔、GDT避雷、三防漆)
+- ✅ 室内 Bias-T 注入盒设计
+- ✅ 测试验收标准 (台架/现场)
+- ✅ 已知局限与 V2.0 改进路线图
+
+> 工程设计: [`references/auto_efhw_tuner_design_full.md`](references/auto_efhw_tuner_design_full.md)
+> 软件设计: [`auto-efhw-tuner/docs/SDD.md`](auto-efhw-tuner/docs/SDD.md)
+> 故障工程: [`auto-efhw-tuner/docs/FDE.md`](auto-efhw-tuner/docs/FDE.md)
+
+---
+
 ## 10. 参考链接与来源
 
 ### 最新 (2025-2026)
@@ -651,6 +708,9 @@ Phase 4 (长期): 户外可靠性验证
 | **DMEGC Ni-Zn 磁环 EFHW 工程分析** 🆕 | **BG1SB / Hermes** | **2026-05-24** | **`references/dmegc_nizn_toroid.md`** |
 | **🆕 The CFHW — EFHW vs Dipole for Portable Ops** | **VA3KOT (John)** | **2026-03-04** | **hamradiooutsidethebox.ca** |
 | **🆕 AA5TB Parallel L-C EFHW Coupler 实验** | **VA3KOT (John)** | **2026-02-04** | **hamradiooutsidethebox.ca** |
+| **🆕 100W 全自动谐振式 EFHW 调谐适配器 — 完整工程设计** | **BG1SB** | **2026-06-07** | **`references/auto_efhw_tuner_design_full.md`** |
+| **🆕 SDD 软件设计文档 (架构/接口/状态机/时序)** | **BG1SB** | **2026-06-08** | **`auto-efhw-tuner/docs/SDD.md`** |
+| **🆕 FDE 故障检测与消除 (FMEA/POST/降级/故障注入)** | **BG1SB** | **2026-06-08** | **`auto-efhw-tuner/docs/FDE.md`** |
 
 ### 经典参考
 
