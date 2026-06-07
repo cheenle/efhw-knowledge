@@ -28,18 +28,17 @@
 ```
 auto-efhw-tuner/
 ├── README.md                    ← 本文件
-├── firmware/                    ← 固件源码 (C, PIC16F1938/XC8)
-│   ├── README.md
-│   ├── config.h                 ← 用户可调参数 (含FDE/POST阈值)
-│   ├── main.h                   ← 全局定义与函数原型 (含诊断模块)
-│   ├── main.c                   ← 主程序入口 (含POST+BOR/WDT恢复)
-│   ├── tuning.h / tuning.c       ← 自动调谐核心算法 (含GPIO回读+安全门控)
-│   ├── swr_bridge.h / swr_bridge.c ← SWR 桥 (Tandem Match) 驱动
-│   ├── eeprom.h / eeprom.c       ← EEPROM 频段记忆 + CRC-8
-│   ├── display.h / display.c     ← 蜂鸣器/LED 状态指示
-│   ├── diagnostics.h / diagnostics.c ← 🆕 运行时故障检测 + 健康状态机
-│   ├── post.h / post.c           ← 🆕 4阶段上电自检 + 复位原因检测
-│   └── Makefile                 ← 编译配置参考
+├── firmware-stm32/              ← 🆕 STM32F103 固件 (基于 ModularTuner)
+│   ├── README.md                ← 架构说明 + 编译指南
+│   ├── efhw_tuner_stm32.ino     ← 主程序 (setup/loop/调谐/串口)
+│   ├── tuner_config.h           ← 引脚映射 + 全部参数
+│   └── lib/
+│       ├── swrmeter/            ← 从 ModularTuner 复用 (Tandem Match)
+│       ├── capbank/             ← 🆕 7位电容阵列 GPIO 直驱
+│       ├── post/                ← 🆕 4阶段 POST 自检
+│       └── diag/                ← 🆕 运行时故障诊断
+├── firmware/                    ← PIC16F1938 固件 (V1.0 参照, 待移植)
+│   ├── ...                      ← (16 files, 保留作为参考实现)
 ├── hardware/                    ← 硬件设计文件
 │   ├── EFHW_TUNER_BOM.csv       ← 完整BOM (带立创商城编号)
 │   ├── SCH_Description.md        ← 🆕 原理图描述 (9节, Netlist级)
