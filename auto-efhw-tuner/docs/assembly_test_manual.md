@@ -1,6 +1,6 @@
 # EFHW Auto Tuner 100W — 装配、测试与故障排查手册
 # ====================================================
-# 版本: V1.0 (2026-06-08)
+# 版本: V2.0 (2026-06-08) — STM32F103 Bluepill 架构
 # 适用: 具备基础焊接与射频测量能力的业余无线电爱好者
 
 ---
@@ -14,14 +14,16 @@
 | 恒温烙铁 (60W+, 可调温) | 焊接 SOIC/1812/THT | 必备 |
 | 0.5mm 焊锡丝 (63/37) | 精细焊点 | 必备 |
 | 助焊剂 (免洗型) | SOIC 拖焊 | 必备 |
-| 防静电手环 | PIC16F1938 防静电 | 必备 |
+| 防静电手环 | STM32F103 防静电 | 必备 |
+| ST-Link V2 调试器 | STM32 烧录/调试 | 必备 |
+| USB-TTL 串口模块 | 串口控制台 (可选) | 推荐 |
 | 数字万用表 | 电压/导通/二极管测试 | 必备 |
 | 镊子 (弯尖) | SMD 贴装 | 必备 |
 | 放大镜/显微镜 | 焊点检查 | 推荐 |
 | 热风枪 | SMD 拆修 | 推荐 |
 | VNA (如 nanoVNA) | 磁环绕线验证/SWR桥调试 | 推荐 |
 | 50Ω/100W 假负载 | 台架校准 | 推荐 |
-| PICkit 3/4 | 固件烧录 | 必备 |
+| **ST-Link V2** | **STM32 固件烧录** | **必备** |
 
 ### 1.2 焊接顺序（关键！按顺序来）
 
@@ -117,7 +119,7 @@
 - 在绕线区域薄涂一层 RTV 硅胶 → 防振动松脱
 - 线圈引线端刮掉漆皮 → 上锡 → 焊到 PCB
 
-### 1.4 SOIC 焊接技巧 (PIC16F1938, ULN2003A)
+### 1.4 Bluepill 模块安装 & SOIC 焊接 (ULN2003A)
 
 ```
 1. 在 PCB 焊盘上涂少量助焊剂
@@ -176,14 +178,15 @@
 ### 2.2 台架测试 2：MCU 与固件
 
 ```
-设备: PICkit 3/4, PC with MPLAB X IPE
+设备: ST-Link V2, PC with Arduino IDE 或 STM32CubeProgrammer
 
 步骤:
-1. 连接 PICkit 到 ICSP 口 (Pin1=MCLR)
-2. MPLAB X IPE → 选择 PIC16F1938 → 连接
-3. 读取 Device ID → 确认芯片识别正确
-4. 擦除 → 烧录 efhw_tuner_100w.hex → 验证
-5. 上电 → 蜂鸣器 1 声短鸣 (正常) / 2声短鸣 (首次/新EEPROM)
+1. 连接 ST-Link 到 SWD 排针 (GND/SWDIO/SWCLK/3.3V)
+2. Bluepill BOOT0 跳线 → 0 (正常运行模式)
+3. Arduino IDE → Board "Generic STM32F103C series" → Upload efhw_tuner_stm32.ino
+   或 STM32CubeProgrammer → 烧录 efhw_tuner_stm32.bin
+4. 打开串口监视器 (115200 baud) → 确认 "EFHW Tuner STM32 ready."
+5. 上电 → 蜂鸣器 1 声短鸣 (POST 通过) / 连续快鸣 (POST 失败)
 6. LED 闪烁 1 次 → 系统自检通过
 ```
 

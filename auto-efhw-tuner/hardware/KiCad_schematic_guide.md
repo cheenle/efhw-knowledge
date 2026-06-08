@@ -1,7 +1,7 @@
 # KiCad 原理图与 PCB 设计指南
 # =================================
-# EFHW Auto Tuner 100W
-# 版本: V1.0
+# EFHW Auto Tuner 100W — STM32F103 Bluepill
+# 版本: V2.0
 # =================================
 
 ## 一、KiCad 项目设置
@@ -32,7 +32,7 @@ File > New Project > "efhw_auto_tuner_100w"
 
 | 元件 | KiCad 自带库 | 推荐操作 |
 |------|-------------|---------|
-| PIC16F1938-I/SO | MCU_Microchip_PIC16 | 直接使用，注意28脚SOIC宽体封装 |
+| STM32F103C8T6 Bluepill | 自建 (DIP-40 排母 ×2) | STM32模块插入排母, 两侧各20P 2.54mm |
 | ULN2003A | Driver_Motor / Transistor_Array | 搜索"ULN2003" |
 | T200-2 磁芯 | 无 | 使用电感符号+自定义封装 |
 | FT37-43 磁芯 | 无 | 同上 |
@@ -190,7 +190,8 @@ File > Fabrication Outputs > Component Placement
 - [ ] 所有继电器封装方向正确 (线圈+/NO/COM 与原理图一致)
 - [ ] 磁环安装孔不在铜箔上(Keepout 区域足够)
 - [ ] M座/天线端子/地网端子的THT焊盘孔径匹配实际螺丝
-- [ ] ICSP排针方向正确 (Pin1 = MCLR)
+- [ ] SWD排针方向正确 (Pin1=VCC, Pin2=SWDIO, Pin3=SWCLK, Pin4=GND)
+- [ ] Bluepill 排母 Pin1 标记与 PCB 丝印对齐
 
 ## 六、KiCad 版本要求
 

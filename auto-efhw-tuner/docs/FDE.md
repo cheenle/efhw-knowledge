@@ -192,6 +192,45 @@ FDE = Echo(需求发现) + Delta(原型交付) + Product(抽象泛化)
 
 ---
 
+### Cycle 5: STM32 架构迁移 & 竞品借壳 (2026-06-08)
+
+**Outcome**: 识别 PIC16F1938 平台的限制 (10-bit ADC, 1KB RAM, 无硬件频率计数器), 决定迁移到 STM32F103, 同时复用 ModularTuner 的开源代码。
+
+**触发因素 (Echo)**:
+- 竞品分析: ModularTuner (KW4TI) 已在 STM32F103 上实现了成熟的 Tandem Match 检波和硬件频率计数
+- ATU-100 STM32 Porting 分支验证了 STM32 替代 PIC 的可行性
+- PIC16 10-bit ADC 在 SWR<1.1 时分辨率不足 (ΔSWR 0.05 ≈ 5 LSB)
+- 1KB RAM 无法容纳 200 条调谐缓存
+
+| FDE 阶段 | 活动 | 产出 |
+|---------|------|------|
+| **Echo** | 对比 3 个竞品 (ModularTuner/ATU-100/Antuner), 识别"借壳"策略 | 差异化分析: T200-2B + 3KV MLCC + Bias-T 为独有组合 |
+| **Delta** | Fork ModularTuner → 裁剪 >3,000 行 (LCD/CAT/I2C/无线) → 适配 CapBank 直驱 → 3.3V ADC 分压网络 | `firmware-stm32/` (10 源文件), `SCH/PCB V2.0`, `BOM_STM32.csv` |
+| **Product** | SDD 14 章全面重写 (IBM TeamSD) → FDE 更新 → 文档体系 V2.0 | 全栈 STM32 设计文档 |
+
+**技术选型决策 (Cycle 5 新增)**:
+
+| 决策 | 方案 | 弃用 | 理由 |
+|------|------|------|------|
+| MCU | **STM32F103C8T6** (Bluepill) | PIC16F1938 | 12-bit ADC (4×), 20KB RAM (20×), 硬件测频, $1.5 |
+| 固件基座 | **复用 ModularTuner** SWRMeter/Freq/Flash | 全自写 | ~2,000 行成熟代码, 减少开发和调试时间 80% |
+| GPIO | **CapBank 直驱** (PA8-14+PB3-4) | MCP23017 I2C | 仅需 7 路, 删 I2C 减少故障点 |
+| ADC 适配 | **10k+10k 分压** (3.3V) | 5V 直连 | STM32 ADC 3.3V 最大输入保护 |
+| 12V 稳压 | **LM2940CT-12 LDO** (0.5V 压差) | LM7812 (2.0V 压差) | 保证 Bias-T 13.8V 输入时稳定输出 12V |
+
+**版本产出**: `auto-efhw-tuner/` V2.0 (STM32 全栈, 30+ 文件)
+
+**碎石路 → 高速公路**:
+```
+碎石路: PIC16 8-bit 全自写 → ADC 精度受限, RAM 不足, 开发周期长
+    ↓ 借壳 + 升级
+高速公路: STM32F103 + ModularTuner 复用的 SWRMeter/FreqCounter
+          + CapBank 直驱 + 3.3V 适配 → 12-bit ADC, 200-entry cache,
+          硬件测频, 平台成熟度飞跃
+```
+
+---
+
 ## 五、FDE 方法论的核心收获
 
 ### 5.1 Echo → Delta → Product 节奏
@@ -203,6 +242,7 @@ Cycle 1 (Echo 为主): 充分调研, 不下结论 ← 避免"过早优化"
 Cycle 2 (Delta 为主): 快速原型, 定量验证 ← 所有关键假设必须算一遍
 Cycle 3 (Delta+Product): 工程交付 + 目录化 ← 从"能跑"到"别人能用"
 Cycle 4 (Product 为主): 抽象泛化, 文档体系 ← 从"我的项目"到"可复制的模板"
+**Cycle 5 (Pivot): STM32 架构迁移** ← 从"PIC 自研"到"借壳 ModularTuner"
 ```
 
 ### 5.2 关键教训
