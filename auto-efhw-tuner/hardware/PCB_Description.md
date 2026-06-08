@@ -1,157 +1,157 @@
-# EFHW Auto Tuner 100W — PCB 布局描述文档 (PCB Layout Description)
+# EFHW Fuchs ATU V3.0 — PCB 布局描述文档
 
-> **Document ID**: PCB-EFHW-STM32-V2.0
-> **Schematic Reference**: SCH-EFHW-STM32-V2.0
-> **Board**: 140mm × 90mm × 1.6mm, 2-layer FR4
-> **MCU Module**: STM32F103C8T6 Bluepill (DIP-40 排母)
-> **Core**: T200-2B ×2 (Carbonyl E Iron Powder, μ=10)
+> **Document ID**: PCB-EFHW-FUCHS-V3.0
+> **Schematic Reference**: SCH-EFHW-FUCHS-V3.0
+> **Board**: 140mm × 50mm × 1.6mm, 2-layer FR4
+> **MCU**: ESP32-S3-WROOM-1 (SMD 模组)
 
 ---
 
 ## 1. 机械规格
 
-### 1.1 板外形与分区
+### 1.1 板外形
 
 ```
         140.00 mm
-   ┌──────────────────────────────────────────────┐  ↑
-   │  H1(5,5)                          H2(135,5)  │  │
-   │   ┌──────────────────────────────┐           │  │
-   │   │    B区: 高压谐振区 (Y:45-90) │           │  │
-   │   │  [T200-2B×2] [K1-K7]       │           │  │
-   │   │  [C1-C7c] [R_bleed]        │           │  │
-   │   │  [HV_BUS 5mm铜轨]          │           │  │
-   │   ├────────────────────────────┤ ← Slot    │  │
-   │   │  2.5mm × 115mm 透空槽    │   Y=45.0   │90.0mm
-   │   │  7根控制线穿越 (0.5mm宽)  │           │  │
-   │   ├────────────────────────────┤           │  │
-   │   │    A区: 低压控制区 (Y:0-45)│           │  │
-   │   │  [Bluepill DIP-40 排母]   │           │  │
-   │   │  [ULN2003A] [LM2940]     │           │  │
-   │   │  [AMS1117] [SWR桥 FT37]  │           │  │
-   │   │  [SWD排针] [BOOT0跳线]   │           │  │
-   │   └──────────────────────────────┘           │  │
-   │  H3(5,85)                        H4(135,85) │  │
-   └──────────────────────────────────────────────┘  ↓
+   ┌──────────────────────────────────────────┐  ↑
+   │  H1(5,5)                      H2(135,5)  │  │
+   │  ┌────────────────────────────────────┐  │  │
+   │  │  单区设计 — 无A/B分区, 统一地平面  │  │  │
+   │  │                                    │  │  │
+   │  │  [ESP32-S3]  X=70 Y=20 (中心)     │  │  │
+   │  │  [LM2940]    X=15 Y=15            │  │  │
+   │  │  [LM2596]    X=20 Y=35            │  │  │50.0mm
+   │  │  [AMS1117]   X=115 Y=15           │  │  │
+   │  │  [IRF9540]   X=115 Y=35           │  │  │
+   │  │  [Servo HDR] X=70 Y=48 (板边)     │  │  │
+   │  │  [GDT pads]  X=130 Y=20           │  │  │
+   │  │  [LED BZR]   X=5 Y=25             │  │  │
+   │  └────────────────────────────────────┘  │  │
+   │  H3(5,45)                    H4(135,45)  │  │
+   └──────────────────────────────────────────┘  ↓
 
-   磁环安装孔: Ø4.0mm ×2 (B区中央 X=55,85 Y=67.5)
-   板固定孔:   Ø3.2mm ×4 (四角)
+   板固定孔: Ø3.2mm ×4 (四角)
 ```
+
+**V2.0→V3.0 关键变化**:
+- 板尺寸从 140×90mm 缩小为 140×**50mm** (节省 44% 面积)
+- 无 B区/A区 分隔 — 无高压隔离槽 (RF 高压不在 PCB 上)
+- 继电器、高压电容、SWR桥全部删除 → PCB 仅为控制+电源板
+- T200-6、可变电容、伺服电机均为 **板上安装(chassis mount)**, PCB 仅提供 3-pin 伺服排针
+
+### 1.2 板上元件 vs 板外元件
+
+| 位置 | 器件 |
+|------|------|
+| **PCB 上** | ESP32-S3, LM2940, LM2596, AMS1117, IRF9540, 2N2222A, 阻容去耦, Bias-V分压, 伺服排针, GDT焊盘, LED, BZR |
+| **底板上 (chassis)** | T200-6 磁环, 空气可变电容, MG996R 伺服, SO-239, M5 天线端子, 齿轮组 |
+
+---
 
 ## 2. 叠层结构
 
 ```
-Layer Stack (双面板, 与V1.0相同):
+Layer Stack (双面板):
   F.Silkscreen  → 顶层丝印
   F.Mask        → 阻焊 (绿色)
-  F.Cu (35µm)   → 信号 + 电源 + HV_BUS
+  F.Cu (35µm)   → 信号 + 电源
   FR-4 (1.6mm)  → Er≈4.5
-  B.Cu (35µm)   → A区完整地平面 + B区地铜排
+  B.Cu (35µm)   → 完整地平面 (无分割)
   B.Mask        → 阻焊
 ```
 
-## 3. 元件布局坐标 (V2.0 更新)
+单区统一地平面。无高压隔离需求。
 
-### 3.1 A区元件 (Y: 0-45mm)
+---
+
+## 3. 元件布局坐标
+
+### 3.1 主要 IC
 
 | 位号 | 封装 | X (mm) | Y (mm) | 旋转 | 备注 |
 |------|------|:------:|:------:|:----:|------|
-| **U1** | **DIP-40 排母 (Bluepill)** | **55** | **25** | **0** | **STM32F103 模块** |
-| U2 | SOIC-16 | 55 | 12 | 0 | ULN2003A |
-| U3 | TO-220 (LM2940) | 115 | 30 | 0 | 12V LDO |
-| U5 | SOT-223 (AMS1117) | 95 | 35 | 0 | 3.3V LDO |
-| D_power | DO-41 | 118 | 22 | 90 | 1N4007 |
-| T2, T3 | FT37-43 磁环 | 75, 90 | 28 | 0 | SWR 桥 |
-| D2, D3 | SOD-123 | 73, 88 | 20 | 0 | BAT41 配对 |
-| R_trim_fwd, R_trim_rev | 3296W | 65, 83 | 8 | 0 | 10kΩ 多圈 |
-| R_fwd_div, R_rev_div | 0805 ×4 | 70-76, 85-91 | 16 | 0 | 10kΩ 分压 (3.3V) |
-| HDR_SWD | 1×4 Pin 2.54mm | 10 | 40 | 90 | ST-Link 调试 |
-| BOOT0 | 1×2 Pin 2.54mm | 10 | 35 | 0 | BOOT0 跳线 |
-| L_bias | CD75/FT37-43 | 15 | 25 | 0 | 扼流圈 |
-| C_block1,2 | 1206 | 25, 30 | 32 | 0 | 隔直电容 |
+| U1 | ESP32-S3-WROOM-1 | 70 | 20 | 0 | 天线区域朝板边 |
+| U2 | TO-220 (LM2940) | 15 | 15 | 0 | 12V LDO, 板边散热 |
+| U3 | SOT-223 (AMS1117) | 115 | 15 | 0 | 3.3V LDO |
+| U4 | LM2596 模块 | 20 | 35 | 0 | 12V→6V DC-DC |
 
-### 3.2 B区元件 (Y: 45-90mm) — 与 V1.0 相同
+### 3.2 MOSFET 与 BJT
 
-| 位号 | 封装 | X | Y | 备注 |
-|------|------|:--:|:--:|------|
-| T1 | T200-2B ×2 双叠 | 70 | 67.5 | 尼龙扎带固定 |
-| K1-K7 | G5Q-14 继电器 | 15-105 | 60 | 7只, 间距15mm |
-| C1-C7c | 1812 MLCC ×10 | 15-115 | 75 | 10只, C6/C7 并联 |
-| R_bleed | 轴向 2.2MΩ/3KV | 125 | 80 | 静电泄放 |
-| GDT1 | 90V 气体放电管 | 115 | 52 | 浪涌保护 |
+| 位号 | 封装 | X (mm) | Y (mm) | 备注 |
+|------|------|:------:|:------:|------|
+| Q1 | TO-220 (IRF9540) | 115 | 35 | P-MOSFET, 伺服供电开关 |
+| Q2 | TO-92 (2N2222A) | 105 | 38 | 栅极驱动 NPN |
+| R_gate | 0805 | 110 | 35 | 10kΩ 栅极下拉 |
+
+### 3.3 连接器与接口
+
+| 位号 | 封装 | X (mm) | Y (mm) | 备注 |
+|------|------|:------:|:------:|------|
+| HDR_SERVO | 1×3 Pin 2.54mm | 70 | 48 | GND/VCC_SERVO/Signal, 板底边缘 |
+| J1 | SO-239 PCB焊盘 | 135 | 10 | 法兰安装到铝壳面板 |
+| GDT1 | 径向 | 130 | 20 | 90V GDT |
+
+### 3.4 被动元件
+
+| 位号 | 封装 | X (mm) | Y (mm) | 备注 |
+|------|------|:------:|:------:|------|
+| D1 | DO-41 (1N4007) | 10 | 18 | 防反 |
+| C_block1,2 | 1206 | 125, 128 | 8 | 隔直 |
+| R_bias_div1,2 | 0805 | 95, 98 | 15 | 47kΩ+10kΩ |
+| C_bias_div | 0805 | 97 | 18 | 100nF |
+| LED1 | 3mm TH | 5 | 22 | |
+| BZ1 | 有源蜂鸣器 TH | 5 | 30 | |
+| C 去耦 ×6 | 0805 | 分散在各 IC 旁 | | 100nF |
+| C 电解 ×4 | D6.3-D8mm | 分散在 LDO 旁 | | 47µF/100µF |
 
 ---
 
-## 4. 关键布线变更 (V2.0)
+## 4. 关键布线
 
-### 4.1 STM32 到 ULN2003A (7路控制)
-
-```
-STM32 PA8  ──────────── ULN2003A IN1 ── K1 (10pF)
-STM32 PA9  ──────────── ULN2003A IN2 ── K2 (22pF)
-STM32 PA10 ──────────── ULN2003A IN3 ── K3 (47pF)
-STM32 PA11 ──────────── ULN2003A IN4 ── K4 (100pF)
-STM32 PA12 ──────────── ULN2003A IN5 ── K5 (220pF)
-STM32 PB3  ──────────── ULN2003A IN6 ── K6 (470pF)   ← 禁用JTAG后释放
-STM32 PB4  ──────────── ULN2003A IN7 ── K7 (1000pF)  ← 禁用JTAG后释放
-
-ULN2003A COM (Pin9) → VCC_12V ← ⚠️ 必须连接!
-```
-
-### 4.2 3.3V ADC 分压网络 (新增)
+### 4.1 伺服电源路径 (高电流)
 
 ```
-BAT41(FWD) 阴极 ──┬── R_fwd_div1(10kΩ) ──┬── STM32 PA0
-                   │                      │
-                   └── R_fwd_div2(10kΩ) ──┴── GND
-                                      │
-                                   100nF → GND  (滤波)
-
-BAT41(REV) 阴极 ──┬── R_rev_div1(10kΩ) ──┬── STM32 PA1
-                   │                      │
-                   └── R_rev_div2(10kΩ) ──┴── GND
-                                      │
-                                   100nF → GND
+VCC_6V (LM2596 OUT) ── 2.0mm宽走线 ──→ Q1(IRF9540) Source
+Q1 Drain ── 2.0mm宽走线 ──→ HDR_SERVO Pin2 (VCC_SERVO)
+HDR_SERVO Pin1 → GND (地平面)
+Q1 Gate ←── Q2(2N2222A) Collector + R_gate(10kΩ) 到 GND
+Q2 Base ←── 1kΩ ←── GPIO2 (SERVO_PWR_CUT)
 ```
 
-### 4.3 Bias-T 电压监测分压
+伺服供电轨最大 3A (堵转)。走线宽度 ≥2.0mm (1oz铜 ≈ 3A 容量)。PCB 上 6V 轨加 100µF 电解 + 100nF 陶瓷旁路。
+
+### 4.2 伺服信号
 
 ```
-VCC_12V ──── R_bias_div1(47kΩ) ──┬── STM32 PA4
-                                  │
-                            R_bias_div2(10kΩ)
-                                  │
-                                 GND
-
-分压比: 10kΩ / (47kΩ+10kΩ) = 0.175
-12V × 0.175 = 2.1V → 安全在 3.3V ADC 范围内
+GPIO1 ── 0.3mm走线 ── HDR_SERVO Pin3
 ```
 
-### 4.4 Bluepill 模块供电
+PWM 50Hz 信号，低电流。常规走线即可。
+
+### 4.3 Bias-T 电压监测
 
 ```
-VCC_3V3 ──→ Bluepill 5V pin (经板上 3.3V regulator 反向供电, 或)
-         ──→ Bluepill 3.3V pin (直接供电 3.3V, 推荐)
-GND    ──→ Bluepill GND pin
+VCC_12V ── 0.3mm走线 ── R_bias_div1(47kΩ) ──┬── GPIO5
+                                              │
+                                        R_bias_div2(10kΩ)
+                                              │
+                                             GND
+```
 
-推荐: 使用 Bluepill 的 3.3V pin 直接供电 (AMS1117 输出),
-      板上 USB 口不接 (不需要 USB 供电).
+高阻抗分压 (总 57kΩ)，走线远离伺服 PWM 和大电流区域，100nF 电容紧靠 GPIO5。
+
+### 4.4 天线/TRX 接线 (板外飞线)
+
+```
+SO-239 芯线 → (飞线) → C_block1/2 PCB焊盘
+C_block 冷端 → (飞线) → T200-6 初级2匝热端
+T200-6 初级冷端 → (飞线) → SO-239 外壳 (GND)
+T200-6 次级热端 → (飞线) → 可变电容定片 → (飞线) → ANT M5 端子
 ```
 
 ---
 
-## 5. 高压隔离验证 (与 V1.0 相同)
-
-| 检查点 | 要求间距 | 设计间距 | 裕度 |
-|--------|:------:|:------:|:---:|
-| HV_BUS ↔ GND_B_HV (同层) | ≥ 5.0mm | 5.0mm | 1.0× |
-| HV_BUS ↔ GND_A (跨层 FR4) | ≥ 0.4mm | 1.6mm | 4.0× |
-| 控制线 ↔ B区地 (穿越槽) | ≥ 1.5mm | 1.5mm | 1.0× |
-| STM32 ↔ B区 (跨开槽 + 1.6mm FR4 + ULN2003A 隔离) | — | 物理开槽 + 达林顿隔离 | 双重 |
-
----
-
-## 6. DRC 自定义规则 (KiCad)
+## 5. DRC 自定义规则 (KiCad)
 
 ```json
 {
@@ -160,23 +160,19 @@ GND    ──→ Bluepill GND pin
     "min_clearance": 0.25,
     "custom_rules": [
       {
-        "name": "HV_BUS_clearance",
-        "net": "HV_BUS",
-        "against": "GND_B_HV",
-        "min_clearance": 5.0
+        "name": "servo_power_width",
+        "net": "VCC_SERVO",
+        "min_width": 2.0
       },
       {
-        "name": "HV_BUS_width",
-        "net": "HV_BUS",
-        "min_width": 5.0
+        "name": "servo_power_clearance",
+        "net": "VCC_SERVO",
+        "against": "GND",
+        "min_clearance": 0.5
       },
       {
-        "name": "Slot_edge_clearance",
-        "edge_cuts_to_copper": 1.25
-      },
-      {
-        "name": "ADC_signal_clearance",
-        "nets": ["ADC_FWD", "ADC_REV"],
+        "name": "adc_signal_clearance",
+        "net": "ADC_BIAS_V",
         "against": "VCC_12V",
         "min_clearance": 1.0
       }
@@ -187,32 +183,32 @@ GND    ──→ Bluepill GND pin
 
 ---
 
-## 7. 制造说明
+## 6. 制造说明
 
 | 参数 | 规格 |
 |------|------|
 | 板材 | FR-4, Tg≥135°C, 1.6mm |
 | 铜厚 | 1oz (35µm) |
-| 表面处理 | ENIG (推荐, 平坦度好) 或 HASL |
+| 表面处理 | ENIG (推荐) 或 HASL |
 | 阻焊 | 绿色 |
 | 最小钻孔 | 0.3mm |
-| 槽孔 | 2.5×115mm 铣槽 |
 | 测试 | 飞针 100% netlist |
 
-### 装配顺序 (V2.0)
+### 装配顺序
 
 ```
-1. 回流焊: 0805/1206 R/C, SOD-123, SOIC-16, SOT-223
-2. 手工焊: TO-220 LM2940, DO-41 1N4007
-3. 手工焊: G5Q-14 ×7, 3296W ×2
-4. 手工焊: Bluepill DIP-40 排母 (注意方向!)
-5. 手工焊: SWD 排针, BOOT0 跳线
-6. 绕制 FT37-43 → 安装; T200-2B 绕线 → 扎带固定
-7. Bluepill 插入排母 → ST-Link 连接 → 烧录
-8. 三防漆喷涂 B区
-9. 入壳: 尼龙柱支撑 → M座拧紧 → 防水接头
+1. 回流焊: ESP32-S3模组, SOT-223 AMS1117, 0805/1206 R/C
+2. 手工焊: TO-220 LM2940, TO-220 IRF9540, TO-92 2N2222A ×2
+3. 手工焊: DO-41 1N4007, LM2596模块, 电解电容
+4. 手工焊: 伺服排针, 接线端子, LED, 蜂鸣器
+5. 入壳: 尼龙柱支撑 PCB → M座拧紧
+6. 安装板外件: T200-6 尼龙扎带固定 → 可变电容+伺服 螺丝固定 → 齿轮耦合
+7. RF 飞线: 按 §4.4 点对点连接 (1.5mm² 铜线)
+8. ESP32-S3 通过 USB 烧录初版固件 → WiFi 配置
+9. 三防漆喷涂 (仅 PCB 面, 避开连接器和散热器)
 ```
 
 ---
 
-> **关联文档**: [`SCH_Description.md`](SCH_Description.md) · [`EFHW_TUNER_BOM_STM32.csv`](EFHW_TUNER_BOM_STM32.csv) · [`nano_banana_prompts.md`](nano_banana_prompts.md)
+> **关联文档**: [`SCH_Description.md`](SCH_Description.md) · [`EFHW_TUNER_BOM_FUCHS.csv`](EFHW_TUNER_BOM_FUCHS.csv)
+> **上一版本**: PCB-EFHW-STM32-V2.0 (已存档为 legacy 参考)
