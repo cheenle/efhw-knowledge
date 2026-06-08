@@ -1,7 +1,7 @@
 # EFHW (End-Fed Half-Wave) 天线知识库
 
 > BG1SB 的 EFHW 天线技术参考知识库
-> 最后更新: 2026-06-08 (🆕 V3.0 Fuchs ESP32-S3 全自动伺服调谐 EFHW 适配器)
+> 最后更新: 2026-06-09 (🆕 V3.0 Fuchs ATU SDD 在线发布 → ybr387rz.mule.page)
 
 ---
 
@@ -17,7 +17,7 @@
 8. [L-Network 匹配方案 (49:1 之外的选择)](#7-l-network-匹配方案-491-之外的选择)
 9. [NEC 建模与辐射特性](#8-nec-建模与辐射特性)
 10. [DIY 制作指南](#9-diy-制作指南)
-11. [🆕 A+C 双模匹配系统 — 高低波段兼顾新方向](#11-ac-双模匹配系统)
+11. [📦 A+C 双模匹配系统 — 已探索/已放弃 (deprecated)](#11-ac-双模匹配系统)
 12. [🆕 V3.0 Fuchs ATU — ESP32-S3 连续伺服调谐 (最新)](#12-v30-fuchs-atu--esp32-s3-连续伺服调谐)
 13. [V1.0/V2.0 自动谐振式 EFHW 调谐适配器 (legacy)](#13-v10v20-自动谐振式-efhw-调谐适配器-legacy)
 
@@ -569,8 +569,10 @@ L-Network 由一个串联电感(L)和一个并联电容(C)组成，替代 49:1 �
 
 ---
 
-## 11. 🆕 A+C 双模匹配系统 — 高低波段兼顾新方向
+## 11. 📦 A+C 双模匹配系统 — 已探索/已放弃 (deprecated)
 
+> ⚠️ **2026-06-09 决策**: A+C 双模方案因工程复杂度太高（8 个工程问题、¥400-600 成本、户外可靠性风险）、且 V3.0 Fuchs ATU 连续伺服调谐方案已覆盖 40m-10m 全自动调谐，**不再继续推进**。本节保留作为技术探索记录。
+>
 > 完整深度分析：`references/efhw_ac_dual_mode.md`
 > 原始方案来源：https://r3cb2mze.mule.page/
 
@@ -613,18 +615,20 @@ L-Network 由一个串联电感(L)和一个并联电容(C)组成，替代 49:1 �
 
 *A+C 的高频段效率优势约 0.2-0.4 dB，在 FT8 弱信号模式下不可感知。FT8 真正的瓶颈是 RX 噪声基底（EFHW 的 S7-S9 底噪），而非 TX 效率。*
 
-### 推荐路线
+### 推荐路线 (已废弃 → 见 V3.0 Fuchs ATU)
 
 ```
-Phase 1 (立即): DMEGC Ni-Zn 单磁芯 → 全频段提升，零新增复杂度
+Phase 1 (完成): DMEGC Ni-Zn 单磁芯 → 全频段提升，零新增复杂度
 Phase 2 (短期): TX/RX 分离 (MLA-30+ 磁环) → 解决最大痛点
-Phase 3 (中期): A+C v2.0 原型 (真空电容 + 50Ω端切换 + 可调匝比)
-Phase 4 (长期): 户外可靠性验证
+Phase 3 (❌ 放弃): A+C v2.0 原型 → 被 V3.0 Fuchs ATU 自动调谐路线替代
+Phase 4 (❌ 放弃): 户外可靠性验证 → V3.0 Fuchs ATU 单伺服+单电容方案可靠性远优于 A+C
 ```
+
+> **当前方向**: V3.0 Fuchs ATU — ESP32-S3 驱动伺服电机连续调谐空气可变电容，纯执行机构、全自动、¥255。详见 [Section 12](#12-v30-fuchs-atu--esp32-s3-连续伺服调谐)。
 
 ### 一句话总结
 
-> A+C 方案代表了一个重要的探索方向：承认单一铁氧体变压器在 80-10m 的物理极限，用分频段多磁芯方案突破瓶颈。当前原型需要工程迭代（高压切换、电容可靠性、阻抗匹配范围），但方向正确，值得继续探索。
+> A+C 方案代表了一个有价值的探索方向，但在工程实践中被证明过于复杂（8 个问题、¥400-600 成本、户外可靠性风险）。V3.0 Fuchs ATU 以更简洁的架构（单伺服 + 单空气可变电容 + 远程 SWR）实现了相同的核心目标：全自动、覆盖 40m-10m、低成本、高可靠性。A+C 的探索经验（分频段磁芯选择、可变电容耐压、Counterpoise 兼容性）已融入 V3.0 设计决策。
 
 ---
 
@@ -650,10 +654,11 @@ V3.0 从 STM32F103 + 继电器切换固定电容全面重构为 **ESP32-S3 + 伺
 
 ### 文档体系
 
+- **🆕 在线 SDD**: **[ybr387rz.mule.page](https://ybr387rz.mule.page/)** — 14章完整软件设计规格书，暗色主题、侧栏导航、架构图全渲染
 - 设计规格: [`docs/superpowers/specs/2026-06-08-fuchs-atu-v3-design.md`](docs/superpowers/specs/2026-06-08-fuchs-atu-v3-design.md)
 - 实施计划: [`docs/superpowers/plans/2026-06-08-fuchs-atu-v3-plan.md`](docs/superpowers/plans/2026-06-08-fuchs-atu-v3-plan.md)
 - 固件源码: [`auto-efhw-tuner/firmware-esp32/`](auto-efhw-tuner/firmware-esp32/) (12 源文件, ESP-IDF v5 C)
-- SDD: [`auto-efhw-tuner/docs/SDD.md`](auto-efhw-tuner/docs/SDD.md) (14章 IBM TeamSD)
+- SDD (源码): [`auto-efhw-tuner/docs/SDD.md`](auto-efhw-tuner/docs/SDD.md) (14章 IBM TeamSD)
 - FDE: [`auto-efhw-tuner/docs/FDE.md`](auto-efhw-tuner/docs/FDE.md) (19故障 FMEA)
 - BOM: [`auto-efhw-tuner/hardware/EFHW_TUNER_BOM_FUCHS.csv`](auto-efhw-tuner/hardware/EFHW_TUNER_BOM_FUCHS.csv)
 - MRRC集成: [`../atu_fuchs_handler.py`](../atu_fuchs_handler.py)
@@ -756,6 +761,7 @@ V3.0 从 STM32F103 + 继电器切换固定电容全面重构为 **ESP32-S3 + 伺
 | **🆕 100W 全自动谐振式 EFHW 调谐适配器 — 完整工程设计** | **BG1SB** | **2026-06-07** | **`references/auto_efhw_tuner_design_full.md`** |
 | **🆕 SDD 软件设计文档 (架构/接口/状态机/时序)** | **BG1SB** | **2026-06-08** | **`auto-efhw-tuner/docs/SDD.md`** |
 | **🆕 FDE 故障检测与消除 (FMEA/POST/降级/故障注入)** | **BG1SB** | **2026-06-08** | **`auto-efhw-tuner/docs/FDE.md`** |
+| **🆕 V3.0 Fuchs ATU SDD 在线版 (14章全渲染)** | **BG1SB** | **2026-06-08** | **[ybr387rz.mule.page](https://ybr387rz.mule.page/)** |
 
 ### 经典参考
 
