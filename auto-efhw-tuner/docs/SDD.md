@@ -1,34 +1,34 @@
-# EFHW Auto Tuner 100W — Software Design Description (SDD)
+# EFHW Fuchs ATU V3.0 — Software Design Description (SDD)
 
-> **Document ID**: SDD-EFHW-STM32-V2.0
-> **Version**: V2.0
+> **Document ID**: SDD-EFHW-FUCHS-V3.0
+> **Version**: V3.0
 > **Date**: 2026-06-08
 > **Status**: Released
 > **Methodology**: IBM Team Solution Design (TeamSD) v2.3.2
-> **MCU**: STM32F103C8T6 (Bluepill, 72MHz Cortex-M3)
-> **Firmware Base**: profdc9/ModularTuner (CC-BY-SA 4.0) + BG1SB 适配
+> **MCU**: ESP32-S3-WROOM-1 (Xtensa LX7 双核 240MHz, 16MB Flash)
+> **Framework**: ESP-IDF v5.x (Native C, FreeRTOS)
 > **License**: GPL-3.0 (Firmware) / CERN-OHL-S 2.0 (Hardware)
 
 ---
 
 ## Document Index
 
-| # | Chapter | ART Code | Key Content |
-|---|---------|----------|-------------|
-| 1 | Executive Summary | — | 项目概览、性能指标、架构层 |
-| 2 | Business Direction | BUS 411 | 用户画像、痛点、差异化 |
-| 3 | Project Definition | ENG 343 | 属性、范围、里程碑 |
-| 4 | System Context | APP 011 | 上下文图、外部接口、数据流 |
-| 5 | Non-Functional Requirements | ART 0507 | 性能/可靠性/安全/环境约束 |
-| 6 | Use Case Model | ART 0508 | UC-001 ~ UC-005 |
-| 7 | Subject Area Model | APP 408 | 实体、状态机、关系图 |
-| 8 | Architecture Decisions | ART 0513 | AD-001 ~ AD-012 |
-| 9 | Architecture Overview | ART 0512 | 分层架构、模块分解、依赖图 |
-| 10 | Service Model | ART 0582 | 7模块接口契约 |
-| 11 | Component Model | ART 0515 | 组件清单、UML图、交互序列 |
-| 12 | Operational Model | ART 0522 | 部署拓扑、运行时、故障恢复 |
-| 13 | Feasibility Assessment | ART 0530 | 风险、资源、替代方案 |
-| 14 | Version History | — | V1.0→V2.0 变更记录 |
+| # | Chapter | Key Content |
+|---|---------|-------------|
+| 1 | Executive Summary | Fuchs ATU V3.0 概览、性能指标、架构分层 |
+| 2 | Business Direction | 目标用户、痛点、差异化(V2.0对比) |
+| 3 | Project Definition | 属性、范围、里程碑 |
+| 4 | System Context | 新上下文图: ATR1000→MRRC→WiFi→ATU |
+| 5 | Non-Functional Requirements | 性能/可靠性/WiFi/安全 |
+| 6 | Use Case Model | UC-001 ~ UC-005 |
+| 7 | Subject Area Model | 实体、状态机(Fuchs状态+调谐阶段) |
+| 8 | Architecture Decisions | AD-001 ~ AD-006 |
+| 9 | Architecture Overview | 4 FreeRTOS 任务 + 事件驱动模型 |
+| 10 | Service Model | 5模块接口契约 |
+| 11 | Component Model | 组件清单+端到端调谐序列 |
+| 12 | Operational Model | 部署拓扑 (室外IP66)、OTA双槽 |
+| 13 | Feasibility Assessment | Flash/RAM预算、风险 |
+| 14 | Version History | V1.0→V2.0→V3.0 |
 
 ---
 
@@ -36,526 +36,600 @@
 
 ## 1.1 Project Overview
 
-**EFHW Auto Tuner 100W** 是一台室外架设、Bias-T 同轴馈电、全自动调谐的末端馈电半波天线适配器。基于 AA5TB 并联 LC 耦合器理论，以 STM32F103 驱动 7 位 128 档高压电容阵列自动扫描调谐。固件复用 Daniel Marks (KW4TI) 的 ModularTuner 开源代码作为 SWR 检波与频率计数基础。
+**EFHW Fuchs ATU V3.0** 是一台室外架设、Bias-T 同轴馈电、WiFi 远程自动调谐的末端馈电半波天线适配器。基于 F5NPV Fuchs 并联 LC 耦合器理论，以 ESP32-S3 驱动伺服电机控制空气可变电容连续调谐。SWR 感知完全委托给 MRRC 侧的 ATR1000，ATU 是纯执行机构。
+
+**V2.0→V3.0 根本变化**: 继电器切换固定电容阵列 → 伺服驱动连续可变电容。板载SWR检测 → 远程ATR1000。STM32F103 串口调试 → ESP32-S3 WiFi WebSocket。
 
 ## 1.2 Key Performance Metrics
 
-| Metric | Target | Achievement |
-|--------|--------|-------------|
-| 调谐时间 | < 2s (全扫描) | 128 × 12ms = 1.54s (早期退出后典型 0.3-0.8s) |
-| SWR 精度 | < 1.2:1 | 128档电容分辨率 ≈ 10-15pF/步 |
-| ADC 分辨率 | 12-bit | LSB = 0.81mV (3.3V/4096) |
-| MCU 算力 | 72 MHz | ~60 MIPS (Cortex-M3) |
-| Flash 用量 | 64KB total | ~20KB (含 ModularTuner 复用 + 本设计新增) |
-| RAM 用量 | 20KB total | ~3KB |
-| 调谐缓存 | 200 条目 | 全 Flash 持久化 |
-| 成本 | — | ~¥390/套 |
+| Metric | Target |
+|--------|--------|
+| 调谐时间 | < 10s (36步粗扫 + 30步细扫, 每步80ms) |
+| 调谐缓存召回 | < 1s (NVS命中直接定位) |
+| 电容分辨率 | 连续 (伺服 0.5° 精度 → ~1.4pF @ 500pF/180°) |
+| MCU 算力 | 240 MHz 双核 Xtensa LX7 |
+| Flash 用量 | 16MB total → ~1.2MB 固件 |
+| RAM 用量 | 512KB SRAM → ~80KB |
+| 调谐缓存 | 16KB NVS 分区 → ~2000 条目 → 40m-10m 每 50kHz |
+| WiFi | 2.4GHz 802.11 b/g/n, WebSocket 长连接 |
+| 成本 | ~¥255/套 (较 V2.0 ¥390 降 35%) |
 
 ## 1.3 Architecture Layers
 
 ```
 ┌──────────────────────────────────────────────────┐
-│  Application: efhw_tuner_stm32.ino               │
-│  setup()→POST→loop{采样→触发→调谐→诊断}          │
+│  Application: atu_main.c                          │
+│  app_main() → 3 FreeRTOS tasks → LED heartbeat    │
 ├──────────────────────────────────────────────────┤
-│  Service: SWRMeter · FrequencyCounter · FlashStore│
-│  (SWRMeter/FreqCounter 复用 ModularTuner)         │
+│  Service: ws_client · tune_engine · health_mon    │
+│  (WebSocket长连/MRRC协议) (缓查→粗扫→细扫)       │
 ├──────────────────────────────────────────────────┤
-│  Domain: CapBank · TuneCache · Post · Diag       │
-│  (cap_sweep_tune / 128-step scan / health FSM)   │
+│  Domain: servo_ctrl · nvs_cache · protocol        │
+│  (LEDC PWM/MOSFET断电) (NVS ±50kHz查) (cJSON)     │
 ├──────────────────────────────────────────────────┤
-│  HAL: GPIO · ADC · TIM · USART · Flash (STM32)   │
+│  HAL: ESP-IDF (GPIO·ADC·LEDC·WiFi·NVS·WDT)       │
 └──────────────────────────────────────────────────┘
 ```
 
-## 1.4 Project Status
-
-V2.0 设计完成。STM32F103 固件 10 源文件 (~1,500 行)。SCH/PCB 描述文档更新至 Bluepill 架构。全部文件已提交至 GitHub。
-
 ---
 
-# 2. Business Direction (BUS 411)
+# 2. Business Direction
 
 ## 2.1 Target Users & Pain Points
 
-| Persona | Pain Point | Solution |
-|---------|-----------|----------|
-| FT8 多频段跳频操作者 | 每次换频段需走到室外手动调电容 | 自动扫描 < 1s 锁定 |
-| SOTA/POTA 便携操作者 | 宽带 49:1 变压器高频段效率低 | T200-2B 粉末铁芯 HF 全段 Q>150 |
-| DX/Contest 爱好者 | 追求极致 TX 效率 | AA5TB 并联谐振 > 90% 效率 |
+| Persona | Pain Point | V3.0 Solution |
+|---------|-----------|---------------|
+| FT8 多频段跳频者 | 换频需重新匹配 | 缓存命中 <1s 定位 |
+| DX/Contest 爱好者 | 追求极致 TX 效率 | 连续调谐实现 SWR<1.1:1 |
+| 远程/无人站点 | 走到室外/爬到阁楼手动调 | WiFi远程完全免接触 |
+| 便携/野外操作者 | 设备越简单越好 | 无SWR桥/无继电器 (最少故障点) |
 
-## 2.2 Competitive Differentiation
+## 2.2 Competitive Differentiation (vs V2.0)
 
-| 维度 | 现有方案 | 本设计 |
-|------|---------|--------|
-| 磁芯 | 43号铁氧体 (μ=850, Q崩塌) | **T200-2B** 羰基铁粉 (μ=10, Q>150@30MHz) |
-| 电容 | 低压贴片 (打火烧毁) | **1812/3KV/C0G ×10** (多并联, 无压降) |
-| MCU | PIC16 8-bit / ATmega | **STM32F103 32-bit** (72MHz, 12-bit ADC) |
-| 供电 | 独立电源线或电池 | **Bias-T 同轴馈电** (一根线搞定) |
-| 代码 | 全自写 | **复用 ModularTuner** SWR/频率/Flash 模块 |
+| 维度 | V2.0 (STM32) | V3.0 Fuchs |
+|------|:-----------:|:----------:|
+| 调谐方式 | 128档继电器步进 | 伺服连续 (180°×0.5°) |
+| SWR 感知 | 板载 Tandem Match | MRRC ATR1000 远程 |
+| 通信 | 串口 | WiFi WebSocket |
+| MCU | STM32F103 72MHz | ESP32-S3 240MHz 双核 |
+| 磁芯 | T200-2B ×2 (μ=10) | T200-6 ×1 (μ=8) |
+| 故障点 | 7继电器+ULN2003A+SWR桥 | 1伺服+1MOSFET |
+| PCB | 140×90mm | 140×50mm |
+| 成本 | ¥390 | ¥255 |
 
 ---
 
-# 3. Project Definition (ENG 343)
-
-## 3.1 Project Attributes
+# 3. Project Definition
 
 | Attribute | Value |
 |-----------|-------|
-| Project Name | EFHW Auto Tuner 100W |
-| Project Type | Embedded hardware + firmware system |
-| MCU | STM32F103C8T6 (Bluepill, Cortex-M3) |
-| Firmware Base | profdc9/ModularTuner (CC-BY-SA 4.0) |
-| Core | T200-2B ×2 (Carbonyl E Iron Powder, μ=10) |
-| Frequency | 40m–10m (7.0–29.7 MHz) |
+| Project Name | EFHW Fuchs ATU V3.0 |
+| Project Type | Embedded firmware + analog RF hardware |
+| MCU | ESP32-S3-WROOM-1 (16MB Flash) |
+| Framework | ESP-IDF v5.x (Native C, FreeRTOS) |
+| Core | T200-6 ×1 (Carbonyl Iron Type 6, μ=8) |
+| Frequency | 40m–10m (7.0–29.7 MHz, WARC全覆盖) |
 | Power | 100W PEP (SSB/CW) |
 | License | GPL-3.0 (Firmware) / CERN-OHL-S 2.0 (Hardware) |
 
-## 3.2 Milestones
+## Milestones
 
 | M# | Date | Deliverable |
 |----|------|-------------|
-| M1 | 2026-06-06 | AA5TB 理论验证 + A+C 双模分析 |
-| M2 | 2026-06-07 | PIC16 工程设计 (Netlist/PCB/BOM) |
-| M3 | 2026-06-08 | PIC16 固件 v1.0 + SDD/FDE v1.0 |
-| M4 | 2026-06-08 | **STM32 架构迁移** (ModularTuner 复用 + 裁剪) |
-| M5 | 2026-06-08 | **硬件文档 V2.0** (SCH/PCB/BOM 全面更新) |
-| M6 | TBD | PCB 打样 + Bluepill 台架测试 |
-| M7 | TBD | 现场 7×24h FT8 验证 |
+| M1-M4 | 2026-06 | V1.0 PIC + V2.0 STM32 |
+| M5 | 2026-06-08 | **V3.0 Fuchs 设计规格 + 实施计划** |
+| M6 | 2026-06-08 | **ESP32-S3 固件 v1.0 (12源文件, ~2800行C)** |
+| M7 | TBD | PCB 打样 + 台架测试 |
+| M8 | TBD | 现场 7×24h FT8 验证 |
 
 ---
 
-# 4. System Context (APP 011)
+# 4. System Context
 
 ## 4.1 System Diagram
 
 ```
-[Radio 100W]──coax──[Bias-T Box: 10nF+22µH+13.8V]──coax(20m)──┐
-                                                                 │
-┌────────────────────────────────────────────────────────────────┼────┐
-│  EFHW Auto Tuner (IP66 AL Enclosure)                          │    │
-│                                                                │    │
-│  ┌──────────┐  ┌──────────┐  ┌────────────┐  ┌────────────┐  │    │
-│  │ Bias-T   │  │ SWR Meter│  │ STM32F103  │  │ CapBank    │  │    │
-│  │ Extract  │  │ Tandem   │  │ Bluepill   │  │ 7×Relay+   │──┼────┤→ Antenna
-│  │ LM2940   │  │ Match    │  │ 72MHz      │  │ 10×1812MLCC│  │    │    ~20m
-│  │ AMS1117  │  │ FT37-43  │  │ 12-bit ADC │  │ T200-2B×2  │  │    │
-│  └──────────┘  └──────────┘  └────────────┘  └────────────┘  │    │
-│                                                                │    │
-│  Protection: 90V GDT + 2.2MΩ bleeder + 2.5mm slot            │    │
-└────────────────────────────────────────────────────────────────┘    │
-                                                                      │
-                            Counterpoise 2m ──────────────────────────┘
+[Radio 100W]──coax──[Bias-T: C+choke+13.8V]──coax(20m)──┐
+                                                          │
+┌─────────────────────────────────────────────────────────┼────┐
+│  EFHW Fuchs ATU (IP66 AL Enclosure 160×110×70mm)       │    │
+│                                                         │    │
+│  ┌────────────────┐  ┌────────────┐  ┌──────────────┐  │    │
+│  │ Bias-T Extract │  │ ESP32-S3   │  │ Fuchs LC     │  │    │
+│  │ L_bias FT37-43 │  │ WiFi STA   │  │ Coupler      │──┼────┤→ Ant ~20m
+│  │ LM2940→LM2596  │  │ WebSocket  │  │ T200-6 2:14T │  │    │
+│  │ →AMS1117       │  │ LEDC PWM   │  │ Air Var Cap  │  │    │
+│  └────────────────┘  │ ADC Bias-V │  │ 10-500pF     │  │    │
+│                      │ GPIO Ctrl  │  │ MG996R Servo │  │    │
+│                      └──────┬─────┘  └──────────────┘  │    │
+│                             │ WiFi                      │    │
+│  Protection: 90V GDT + 2.2MΩ bleeder                  │    │
+└─────────────────────────────┼───────────────────────────┘    │
+                              │                                │
+                    ┌─────────┴─────────┐                      │
+                    │  Home WiFi Router │                      │
+                    └─────────┬─────────┘                      │
+                              │                                │
+                    ┌─────────┴─────────┐                      │
+                    │   MRRC Server      │                     │
+                    │   ATR1000 → SWR    │                     │
+                    │   WebUI ATU Panel  │                     │
+                    └────────────────────┘                     │
 ```
 
 ## 4.2 External Interfaces
 
-| Interface | Physical | Signal |
-|-----------|----------|--------|
-| RF IN | SO-239 M座 | 50Ω, 1.8-30MHz, ≤100W + 13.8V DC Bias-T |
-| Antenna OUT | M5 304 SS bolt + PTFE | ~2,112Ω, ≤3KV peak |
-| Counterpoise | M5 304 SS bolt | GND reference, 2m wire |
-| SWD Debug | 4-pin 2.54mm header | ST-Link (PA13/PA14) |
+| Interface | Physical | Signal/Protocol |
+|-----------|----------|-----------------|
+| RF IN | SO-239 M座 | 50Ω, 1.8-30MHz, ≤100W + 13.8V DC |
+| Antenna OUT | M5 304SS bolt + PTFE | ~2,450Ω, ≤3KV peak |
+| WiFi | ESP32-S3 PCB天线 | 2.4GHz 802.11 b/g/n, WPA2 |
+| WebSocket | TCP/ws over WiFi | JSON 协议 (见 protocol.h) |
+| USB | ESP32-S3 USB Serial/JTAG | 烧录 + 调试, 115200bps |
 
 ## 4.3 Data Flow
 
 | Flow | Path |
 |------|------|
-| SWR 采样 | Tandem Match → BAT41 → 10k+10k divider → PA0/PA1 ADC (12-bit) |
-| 频率计数 | RF sample → PB9 TIM4_CH4 hardware capture |
-| 电容控制 | STM32 GPIO → ULN2003A → G5Q-14 relay coils |
-| Bias-V 监测 | VCC_12V → 47k+10k divider → PA4 ADC |
-| Flash 持久化 | TuneCache + params → STM32 internal Flash page 0x0801FC00 |
+| SWR采样 | **不在ATU上。** ATR1000 → MRRC → WebSocket → ESP32-S3 |
+| 调谐命令 | Browser → MRRC → WebSocket → ESP32-S3 → 伺服PWM |
+| 电容控制 | ESP32-S3 LEDC_CH0 (GPIO1) → MG996R → 齿轮 → 可变电容 |
+| Bias-V 监测 | VCC_12V → 47k+10k分压 → GPIO5 ADC1_CH4 (12-bit) |
+| 事件上报 | ESP32-S3 → WebSocket → MRRC → Browser UI |
+| 固件更新 | MRRC → WiFi → ESP32-S3 OTA (双槽) |
 
 ---
 
-# 5. Non-Functional Requirements (ART 0507)
+# 5. Non-Functional Requirements
 
 ## 5.1 Performance
 
 | ID | Requirement | Target | Implementation |
 |----|------------|--------|----------------|
-| P01 | 调谐全扫描 | < 2s | 128×12ms relay settle = 1.54s |
-| P02 | 调谐重召 | < 0.5s | TuneCache.load() + fine tune ±7 steps |
-| P03 | ADC 采样 | 12-bit @ 100Hz | analogRead() + oversampling |
-| P04 | 频率测量 | ±1kHz @ HF | TIM4 硬件捕获 (reuse ModularTuner) |
-| P05 | POST 完成 | < 2s | 4-phase: DC→ADC→Relay→SWR |
+| P01 | 全扫描调谐 | < 10s | 36粗步+30细步 × 80ms/步 + SWR往返 ~100ms |
+| P02 | 缓存命中调谐 | < 1s | NVS查→直接定位伺服 |
+| P03 | 伺服定位精度 | ±0.5° | 16-bit PWM, 180°满量程 |
+| P04 | WiFi重连 | < 10s | 自动重连, 间隔 3s |
+| P05 | WebSocket心跳 | 30s | Ping/Pong 保持长连接 |
 
 ## 5.2 Reliability & Safety
 
 | ID | Requirement | Implementation |
 |----|------------|----------------|
-| R01 | 禁止大功率调谐 | fwd_power > 15W → abort + bypass |
-| R02 | GPIO 回写验证 | CapBank::setValue() 3-retry → mark failed bit |
-| R03 | 降级运行 | SYS_DEGRADED: exclude failed relay, continue with N/7 bits |
-| R04 | 安全失效 | SYS_SAFE: all relays OFF, lock last-known good C value |
-| R05 | 看门狗 | STM32 IWDG (independent watchdog, 2s timeout) |
+| R01 | 禁止大功率调谐 | fwd_pwr > 15W → 中止+伺服归零 (由MRRC检测) |
+| R02 | RF丢失保护 | fwd_pwr < 0.5W → 中止 (由MRRC检测) |
+| R03 | 伺服堵转检测 | 3次位置无变化 → 断电+告警 |
+| R04 | 看门狗 | ESP32-S3 Task WDT 5s + RTC WDT |
+| R05 | 调谐后伺服断电 | MOSFET切断6V供电 (GPIO2 HIGH) |
+| R06 | NVS 写失败 | 日志记录, RAM缓存继续工作 |
 
 ## 5.3 Environmental
 
 | ID | Requirement | Target |
 |----|------------|--------|
 | E01 | 工作温度 | -20°C ~ +60°C |
-| E02 | 防护 | IP66 (防尘+防强力喷水) |
-| E03 | 冷凝处理 | 底部 1.5mm 呼吸孔 + 干燥剂 |
+| E02 | 防护 | IP66 |
+| E03 | WiFi 距离 | 距路由器 30m 内稳定 (2.4GHz穿墙能力) |
 
 ---
 
-# 6. Use Case Model (ART 0508)
+# 6. Use Case Model
 
-### UC-001: Auto-Tune (Full Scan)
+### UC-001: Auto-Tune via MRRC (主用例)
 
 ```
-Actor: HAM Operator (换频段 → 5W CW carrier)
-Precondition: Bias-T powered, STM32 HEALTHY, fwd_power ∈ [0.5W, 15W]
-Postcondition: CapBank locked at best_c, SWR < 1.2:1
+Actor: HAM Operator (点击Web UI "Auto Tune" 按钮, 发射5W CW)
+Precondition: ATU WiFi已连接, MRRC在线, fwd_pwr ∈ [0.5W, 15W]
+Postcondition: 伺服锁定最优位置, SWR < 1.2:1
 
 Basic Flow:
-1. User switches band → transmits 5W CW
-2. loop() detects fwd_power > 0.5W → checks cooldown
-3. cap_sweep_tune() called:
-   for c = 0..127:
-     capBank.setValue(c) → GPIO write + verify (3 retries)
-     delay(12ms)         → G5Q-14 mechanical settle
-     swrMeter.sampleSWR()
-     if fwd_power > 15W → abort + bypass (protect relays)
-     if swr < min_swr → update best_c
-     if swr < 1.05  → break (early exit)
-4. capBank.setValue(best_c) → TuneCache.save(freq, best_c)
-5. signalBeep(1) → success
+1. 用户点击 "Auto Tune" → MRRC读ATR1000 SWR
+2. MRRC发送 tune_start {freq_hz, swr, fwd_pwr_w} → ESP32-S3
+3. ESP32-S3查NVS缓存:
+   - 命中 → 伺服直接定位, 上报 tune_done (< 1s)
+   - 未命中 → 启动粗扫
+4. 粗扫: 伺服 0°→180° @ 5°/步 × 36步
+   每步: 伺服移动 → 等待SWR (MRRC→ATR1000→回传, ~100ms)
+   记录 min_SWR 位置
+   SWR < 1.05 → 提前退出
+5. 如果 min_SWR > 1.5: 细扫 ±15° @ 1°/步
+6. 锁定最优位置 → 写入NVS → 伺服断电 → 上报 tune_done
 ```
 
-### UC-002: Quick Re-Tune
+### UC-002: Cache Hit Quick Re-Tune
 
 ```
 Actor: HAM Operator (回到之前调谐过的频段)
 Flow:
-1. TuneCache.load(freq) → returns saved cap_value
-2. capBank.setValue(saved_c) → verify SWR < 2.0
-3. If OK: fine-tune ±7 steps around saved_c
-4. If stale: fallback to UC-001 full scan
+1. NVS查找 ±50kHz → 命中
+2. 伺服直接定位到缓存位置
+3. 上报 tune_done (< 1s)
+4. 如果用户发现 SWR > 2.0 → 手动再次触发全扫描
 ```
 
-### UC-003: POST Self-Test
+### UC-003: WiFi Lost Graceful
 
 ```
-Actor: Power System (上电/复位)
+Actor: Network (WiFi 断开)
 Flow:
-1. PHASE 0: checkDC() — read STM32 internal Vrefint (CH17)
-2. PHASE 1: Core — code executing = oscillator/Flash OK
-3. PHASE 2: checkADC() — 8 consecutive reads, verify non-stuck
-4. PHASE 3: checkRelays() — toggle each GPIO briefly
-5. PHASE 4: checkSWRBridge() — FWD/REV noise floor > 0
+1. WiFi事件 DISCONNECTED → connected = false
+2. LED 快闪 (200ms周期) 指示断连
+3. 每10秒自动重试连接
+4. 重连成功后自动恢复 WebSocket
+5. 断连期间调谐命令无法执行 → MRRC提示 "ATU offline"
+6. NVS缓存本地保留 (不受网络影响)
 ```
 
-### UC-004: Graceful Degradation
+### UC-004: OTA Firmware Update
 
 ```
-Actor: DiagMonitor (每 10s 巡检)
+Actor: HAM Operator (通过MRRC推送固件)
 Flow:
-1. diagMon.runChecks() → ADC stuck? SWR sensor plausible?
-2. If 1-2 relays failed → SYS_DEGRADED (CapBank excludes them)
-3. If ≥3 failures or consecutive_tune_fails ≥ 3 → SYS_SAFE
-4. SAFE → all relays OFF → lock last-known C value → no auto-tune
+1. MRRC通知ESP32-S3 "有新固件"
+2. ESP32-S3通过HTTPS从MRRC下载新固件到 ota_1 分区
+3. 校验OK → 设置启动分区 → 重启
+4. 启动失败 → 自动回滚到 ota_0
 ```
 
-### UC-005: Normal TX (High Power)
+### UC-005: Health Monitor Runtime
 
 ```
-Actor: HAM Operator (100W SSB/CW after tune complete)
+Actor: System (每10秒自动)
 Flow:
-1. Tune complete → tuner_state = IDLE, capBank locked
-2. User increases power to 100W
-3. loop() detects fwd_power > 15W → skips auto-tune trigger
-4. Relays remain static (no hot-switching risk)
-5. Diag monitoring continues in background
+1. 读 Bias-T 电压 (<10V 或 >15V → DEGRADED)
+2. 读核心温度 (>80°C → DEGRADED)
+3. 上报 health_alert 到 MRRC
+4. HEALTHY → DEGRADED 时限制自动调谐
 ```
 
 ---
 
-# 7. Subject Area Model (APP 408)
+# 7. Subject Area Model
 
 ## 7.1 Domain Entities
 
 | Entity | Attributes | Persistence |
 |--------|-----------|-------------|
-| **CapBank** | current_value(0-127), failed_mask(7bit) | RAM |
-| **TuneCache** | entries[200]{freq_khz, cap_value} | STM32 Flash page |
-| **SWRReading** | fwd_pwr, rev_pwr, swr, freq_hz | RAM (last reading) |
-| **HealthState** | HEALTHY/DEGRADED/SAFE, fault_log[16] | RAM |
-| **TuneResult** | success, best_cap, best_swr, error | Stack (transient) |
+| **ServoState** | current_angle(0-180), prev_angle | RAM |
+| **TuneCache** | 2000+ entries{freq_khz→servo_pos} | NVS Flash (nvs_tune分区 24KB) |
+| **WSConnection** | connected(bool), ws_handle | RAM |
+| **HealthState** | HEALTHY/DEGRADED/SAFE, bias_voltage, core_temp | RAM |
+| **TuneSession** | freq_hz, phase, best_pos, best_swr, coarse_step, fine_step | RAM (transient) |
 
-## 7.2 Health State Machine
+## 7.2 ATU State Machine
 
 ```
-  POWER-ON ──POST──▶ HEALTHY (7/7 relays OK)
-                          │
-          1-2 relays fail │  CRITICAL fault
-                          ▼
-                      DEGRADED (N/7 relays, still tunes)
-                          │
-         ≥3 relays fail   │
-         or 3× tune fail  │
-                          ▼
-                      SAFE (all OFF, locked C, no auto-tune)
-                          │
-              ONLY exit: power cycle + full POST pass
+         POWER-ON ──WiFi连──▶ ATU_IDLE
+                                   │
+                      tune_start   │  bypass / abort
+                                   ▼
+                              ATU_SWEEPING (粗扫)
+                                   │
+                    cache hit /    │  coarse done
+                    SWR < 1.05     │
+                         │         │
+                         │    ┌────┴────┐
+                         │    │ SWR>1.5 │ SWR≤1.5
+                         │    ▼         │
+                         │ ATU_FINE_TUNING
+                         │    │         │
+                         │    └────┬────┘
+                         ▼         ▼
+                       ATU_LOCKED (调谐完成, 伺服断电)
+                                   │
+                          freq change / manual re-tune
+                                   │
+                                   ▼
+                              ATU_IDLE
+```
+
+## 7.3 Health FSM
+
+```
+  POST ──▶ SYS_HEALTHY
+               │
+  voltage fault/temp fault
+               ▼
+          SYS_DEGRADED (仍可调谐, 仅告警)
+               │
+  critical (连续3次调谐失败 / WDT触发)
+               ▼
+           SYS_SAFE (伺服归零, 禁调谐)
+               │
+    ONLY exit: power cycle + 健康恢复
 ```
 
 ---
 
-# 8. Architecture Decisions (ART 0513)
+# 8. Architecture Decisions
 
-### AD-001: MCU Platform
-
-| Field | Value |
-|-------|-------|
-| **Decision** | **STM32F103C8T6** (Bluepill) + Arduino/STM32duino framework |
-| **Problem** | PIC16F1938 10-bit ADC insufficient for fine SWR measurement; limited RAM (1KB) cannot hold 200-entry cache |
-| **Alternatives** | ATmega328P (Arduino, 无12-bit ADC); ESP32 (WiFi功耗高) |
-| **Rationale** | 12-bit ADC (4× PIC resolution), 20KB RAM (20×), 64KB Flash (2.3×), 硬件频率计数器, $1.5 Bluepill 极低成本 |
-| **Impact** | 可复用 ModularTuner 的 SWRMeter/FrequencyCounter/FlashStore; 3.3V ADC 需分压适配; 放弃 PIC 生态 |
-
-### AD-002: Firmware Reuse Strategy
+### AD-001: ESP32-S3 单芯片架构
 
 | Field | Value |
 |-------|-------|
-| **Decision** | **复用 ModularTuner SWRMeter + FrequencyCounter + flashstruct** |
-| **Rationale** | SWRMeter 已实现完整的 Tandem Match 采样/校准/复数阻抗计算; FrequencyCounter 提供硬件定时器捕获测频; Flash 存储提供掉电不丢失的调谐缓存 |
-| **Impact** | ~2,000 行成熟代码直接复用; 裁剪 >3,000 行不需要的模块 (LCD/I2C/CAT/无线/多模块) |
+| **Decision** | **ESP32-S3-WROOM-1** 单芯片 (替代 F5NPV 的 ESP8266+Arduino Nano 双MCU) |
+| **Rationale** | 双核240MHz, 512KB SRAM, WiFi/BLE, LEDC PWM (伺服), 12-bit ADC (Bias-V), USB/JTAG, 16MB Flash (OTA双槽+NVS缓存) |
+| **Alternatives** | ESP8266 (老旧, 无LEDC), ESP32-C3 (单核, 无USB/JTAG), STM32F103+ESP-01S (双芯片增加故障点) |
+| **Impact** | 固件从Arduino框架迁移到ESP-IDF原生C; 全部功能单芯片实现 |
 
-### AD-003: CapBank — GPIO 直驱 vs I2C 扩展
-
-| Field | Value |
-|-------|-------|
-| **Decision** | **STM32 GPIO 直驱** (PA8-PA14 + PB3-PB4), 保持 SWD |
-| **Rationale** | ModularTuner 使用 MCP23017 I2C 扩展芯片。本设计仅需 7 路输出 (不是 16+ 路), 且 STM32 有足够 GPIO。删掉 I2C 减少故障点 |
-| **Impact** | 需 `afio_cfg_debug_ports(SW_ONLY)` 释放 PB3/PB4; SWD (PA13/PA14) 保留用于调试 |
-
-### AD-004: 3.3V ADC 适配
+### AD-002: Fuchs 拓扑 (并联LC)
 
 | Field | Value |
 |-------|-------|
-| **Decision** | **10kΩ+10kΩ 分压** + 100nF NPO 滤波, 将 SWR 检波输出适配到 STM32 3.3V ADC |
-| **Rationale** | BAT41 检波输出在 100W 时可达 4-5V, 超过 STM32 3.3V 最大输入。0.5× 分压保护 ADC, 同时在固件中乘 2 恢复 |
-| **Impact** | 4 只额外 0805 电阻; 校准系数需台架重新标定 |
+| **Decision** | **T200-6 单磁芯 2:14T + 空气可变电容 10-500pF** (F5NPV/M0UKD系) |
+| **Rationale** | Type 6低μ(8)高频Q>150; 连续调谐实现SWR<1.1:1; 单电容覆盖40m-10m; 无继电器(零热切换风险) |
+| **Impact** | 放弃V2.0的T200-2B双叠+7位电容阵列; B_peak校核通过(12.7mT vs 600mT饱和) |
 
-### AD-005: 磁芯 — T200-2B (Type 2 羰基铁粉)
+### AD-003: 无板载SWR (远程ATR1000)
 
 | Field | Value |
 |-------|-------|
-| **Decision** | **T200-2B ×2 双叠** (Carbonyl E, μ=10) |
-| **Rationale** | Mix-2 在 HF 全段 Q>150 (28MHz 仍有 Q>160), 远超铁氧体; B_peak @ 100W/40m = 5.6mT (143× 裕度) |
-| **Impact** | 需要 13T 次级 (补偿低 μ); 双叠增大功率容量 |
+| **Decision** | **ATU不采样SWR**, 完全依赖MRRC侧的ATR1000通过WebSocket提供 |
+| **Rationale** | 删掉Tandem Match桥(BAT41/FT37-43/校准电位器), 减少BOM和故障点; 调谐精度由ATR1000保证(优于自制SWR桥) |
+| **Impact** | 调谐每步延迟取决于网络往返(~50-100ms); 断网时不可调谐(设计取舍: 室外IP66用WiFi) |
 
-### AD-006 ~ AD-012
+### AD-004: 伺服连续调谐 vs 继电器步进
 
-*(供电 Bias-T、电容 1812/3KV/C0G、继电器 G5Q-14、SWR Tandem Match、故障检测 3 级、降级 HEALTHY→SAFE — 与 V1.0 相同, 见原 SDD §8)*
+| Field | Value |
+|-------|-------|
+| **Decision** | **MG996R伺服驱动空气可变电容连续调谐** |
+| **Rationale** | F5NPV验证过的方案; 连续可调避免档位跳变; 调谐后断电消抖; 故障点从7继电器→1伺服 |
+| **Impact** | 调谐时间稍长(8s vs 1.5s全扫描)但精度高; 需要齿轮减速匹配; 堵转检测 |
+
+### AD-005: 固件框架 — ESP-IDF vs Arduino
+
+| Field | Value |
+|-------|-------|
+| **Decision** | **ESP-IDF v5.x 原生C** (非Arduino) |
+| **Rationale** | LEDC PWM / ADC oneshot / NVS分区 / OTA双槽 / Task WDT 用IDF API更可控; Arduino封装层增加开销 |
+| **Impact** | 需要完整的ESP-IDF工具链; 不能复用V2.0的任何Arduino代码 |
+
+### AD-006: NVS调谐缓存
+
+| Field | Value |
+|-------|-------|
+| **Decision** | **专用nvs_tune分区(24KB)** 存储频率→位置映射, ±50kHz匹配 |
+| **Rationale** | 冷启动全扫描后, 同频段秒级切换; 2000条目覆盖40m-10m每50kHz; NVS掉电不丢失 |
+| **Impact** | 占用一个Flash分区; 首次使用某频段需全扫(建立缓存) |
 
 ---
 
-# 9. Architecture Overview (ART 0512)
+# 9. Architecture Overview
 
 ## 9.1 Module Decomposition
 
 ```
-efhw_tuner_stm32.ino  ← 应用层 (setup/loop/tune/串口)
+atu_main.c  ← 应用层 (app_main / FreeRTOS tasks / LED heartbeat)
     │
-    ├── tuner_config.h      ← 全部编译时常量
+    ├── atu_config.h         ← 全部编译时常量+引脚映射+类型定义
     │
-    ├── lib/capbank/        ← 电容阵列域
-    │   ├── CapBank         ← 7位 GPIO 直驱 + 回读验证
-    │   └── TuneCache       ← 200条频率-电容映射 (RAM + Flash)
+    ├── ws_client.h/c        ← WebSocket 通信层
+    │   WiFi STA管理 · WS长连接 · JSON命令分派 · 发送队列
     │
-    ├── lib/swrmeter/       ← 从 ModularTuner 复用
-    │   ├── SWRMeter        ← Tandem Match 检波 (ADC采样/校准/SWR)
-    │   ├── Complex         ← 复数运算
-    │   └── FrequencyCounter← TIM4 硬件捕获测频
+    ├── tune_engine.h/c      ← 调谐算法域
+    │   缓存查→粗扫(36步@5°)→细扫(30步@1°)→锁定
+    │   功率安全检查 · 早期退出 · 结果上报
     │
-    ├── lib/post/           ← 上电自检
-    │   └── PostRunner      ← 4阶段 POST
+    ├── servo_ctrl.h/c       ← 伺服驱动域
+    │   LEDC PWM 50Hz 16bit · MG996R角度控制 · MOSFET断电
     │
-    └── lib/diag/           ← 运行时诊断
-        └── DiagMonitor     ← 故障检测 + 健康状态机
+    ├── nvs_cache.h/c        ← 持久化域
+    │   频率→位置映射 · ±50kHz模糊查找 · NVS读写
+    │
+    ├── health_mon.h/c       ← 健康监控域
+    │   Bias-V ADC · 核心温度 · 健康FSM
+    │
+    └── protocol.h/c         ← 协议域
+        JSON parse (cJSON) · JSON build · 6种消息类型
 ```
 
-## 9.2 Dependency Graph
+## 9.2 FreeRTOS Tasks
 
-```
-efhw_tuner_stm32.ino
-    ├── tuner_config.h  ← 所有模块 include
-    ├── CapBank         ← (独立: GPIO only)
-    ├── TuneCache       ← (独立: RAM + Flash)
-    ├── SWRMeter        ← lib/swrmeter/ (复用 ModularTuner)
-    ├── FrequencyCounter← lib/swrmeter/ (复用 ModularTuner)
-    ├── PostRunner      ← (依赖: CapBank, SWRMeter)
-    └── DiagMonitor     ← (依赖: CapBank)
-```
+| Task | Priority | Stack | Role |
+|------|:--------:|:-----:|------|
+| **ws_client_task** | 3 (高) | 8192 | WiFi连接+WebSocket收发+JSON命令分派+发送队列处理 |
+| **tune_engine_task** | 2 | 4096 | 事件驱动: 接收SWR更新 → 步进伺服 → 上报进度 |
+| **health_mon_task** | 1 (低) | 3072 | 每10s: Bias-V ADC + 核心温度 + 健康FSM |
+
+Tasks间通信: `send_queue` (FreeRTOS Queue, ws_client→WS发送) + 直接函数调用 (ws_client→tune_engine via tune_engine_feed_swr)
 
 ## 9.3 Key Design Patterns
 
 | Pattern | Implementation |
 |---------|---------------|
-| **State Machine** | tuner_state_t: IDLE → TUNING → LOCKED |
-| **Health FSM** | SYS_HEALTHY → DEGRADED → SAFE |
-| **Early Exit** | SWR < 1.05 → break during sweep |
-| **Write-Verify** | CapBank::setValue(): write GPIO → read IDR → compare → retry×3 |
-| **LRU Cache** | TuneCache: hit → move-to-top; miss → evict last |
-| **Ring Buffer** | DiagMonitor::fault_log[16] |
+| **Event-Driven Tuning** | SWR通过WebSocket异步到达 → tune_engine_feed_swr() 步进状态机 |
+| **Callback** | tune_engine → ws_client_send() 上报进度/结果 |
+| **Queue** | ws_client_send() 线程安全 (FreeRTOS Queue) |
+| **Early Exit** | SWR < 1.05 提前结束粗扫 |
+| **Power-Cut Idle** | 调谐完成/空闲: MOSFET切断伺服6V供电 |
+| **Watchdog** | ESP Task WDT 5s + RTC WDT |
+| **Dual-Slot OTA** | ota_0 / ota_1 交替升级, 失败自动回滚 |
 
 ---
 
-# 10. Service Model (ART 0582)
+# 10. Service Model
 
-### 10.1 CapBank — Capacitor Array Driver
+### 10.1 ws_client — WebSocket Client
 
 | Operation | Signature | Pre-condition | Post-condition |
 |-----------|-----------|--------------|----------------|
-| setup | `void setup()` | — | 7 GPIOs configured as PP outputs, all LOW |
-| setValue | `bool setValue(uint8_t v)` | v ∈ [0,127] | GPIOs = v & ~failed_mask, read-back verified |
-| verifyWrite | `bool verifyWrite(uint8_t v)` | — | Returns true if IDR matches |
-| getAvailableBits | `uint8_t getAvailableBits()` | — | Count of relays not in failed_mask |
+| task | `ws_client_task(void*)` | — | WiFi STA + WS forever loop |
+| send | `bool ws_client_send(const char*)` | WiFi+WS connected | JSON入队+发送 |
+| is_connected | `bool ws_client_is_connected(void)` | — | true/false |
 
-**Invariant**: After every `setValue()`, `digitalRead(pin) == expected_state` for all non-failed bits.
+**处理命令**: tune_start → tune_engine_start() · swr_update → tune_engine_feed_swr() · tune_abort → tune_engine_abort() · set_bypass → servo_set_angle(0) · get_status → proto_build_status_report()
 
-### 10.2 SWRMeter — SWR Measurement (复用 ModularTuner)
+### 10.2 tune_engine — Tuning Engine
 
 | Operation | Returns | WCET |
 |-----------|---------|------|
-| `setup()` | — | 200ms |
-| `sampleSWR()` | — | 1ms (ADC sampling) |
-| `fwdPower()` | float (raw ADC) | <1µs |
-| `revPower()` | float (raw ADC) | <1µs |
-| `SWR()` | float | <10µs |
-| `reflectionCoefficient()` | Complex | <10µs |
-| `calculateImpedance()` | Complex | <10µs |
+| `tune_engine_init()` | — | < 1ms |
+| `tune_engine_start(freq, swr)` | — | NVS查+直接定位 < 5ms |
+| `tune_engine_feed_swr(swr, pwr)` | — | 状态转移 < 5ms + 伺服移动80ms |
+| `tune_engine_abort()` | — | < 80ms |
 
-### 10.3 TuneCache — Frequency Memory
+**状态转移**: 每次 feed_swr 调用推动状态机一步 (coarse_step++ 或 fine_step++), 然后设置 swr_pending=true 等待下一个SWR。
 
-| Operation | Pre-condition | WCET |
-|-----------|--------------|------|
-| `find(freq_hz)` | — | O(n), n≤200 |
-| `save(freq_hz, cap_value)` | — | O(n) + Flash write |
-| `load(freq_hz, &cap_value)` | freq in cache | O(n) |
+### 10.3 servo_ctrl — Servo Controller
 
-**Flash persistence**: TuneCache + params saved to STM32 Flash page 0x0801FC00 via `flashstruct` (复用 ModularTuner).
+| Operation | Pre-condition | Post-condition |
+|-----------|--------------|----------------|
+| `servo_init()` | — | LEDC+PWM+GPIO就绪, 伺服断电 |
+| `servo_set_angle(deg)` | 伺服已供电 | 角度更新, delay 80ms |
+| `servo_power_on()` | — | MOSFET导通, 伺服VCC=6V |
+| `servo_power_off()` | — | MOSFET关断, 伺服VCC=0V |
 
-### 10.4 PostRunner — Power-On Self Test
+### 10.4 nvs_cache — Tune Cache
 
-| Phase | Check | Failure Action |
-|-------|-------|---------------|
-| DC | Internal Vrefint (CH17) ≈ 1.20V | Halt (critical) |
-| ADC | 8× consecutive reads verify non-stuck | DEGRADED |
-| Relays | Toggle each GPIO briefly | Mark failed bits |
-| SWR Bridge | FWD/REV noise floor > 0 | DEGRADED |
+| Operation | WCET |
+|-----------|------|
+| `nvs_cache_init()` | < 50ms |
+| `nvs_cache_lookup(freq_hz, *pos)` | O(tolerance) ≈ 11次NVS读 |
+| `nvs_cache_save(freq_hz, pos)` | < 50ms (含Flash写) |
 
-### 10.5 DiagMonitor — Runtime Diagnostics
+### 10.5 health_mon — Health Monitor
 
-| Check | Period | Failure Action |
-|-------|--------|---------------|
-| SWR plausibility | 10s | REV > 2×FWD → DEGRADED |
-| ADC stuck | Continuous | 8× same reading → ADC reset → DEGRADED |
-| Consecutive tune fails | Per tune | ≥3 → SAFE |
+| Check | Period | WCET |
+|-------|--------|------|
+| Bias-V ADC read + 校准 | 10s | < 1ms |
+| Core temperature read | 10s | < 1ms |
+| Health FSM update | 10s | < 1µs |
 
 ---
 
-# 11. Component Model (ART 0515)
+# 11. Component Model
 
 ## 11.1 Component Inventory
 
-| Component | Type | Source | Responsibility |
-|-----------|------|--------|----------------|
-| efhw_tuner_stm32 | Application | BG1SB (ino) | Main loop, tune trigger, serial console |
-| CapBank | Domain | BG1SB (cpp) | 7-bit GPIO direct drive, write-verify |
-| TuneCache | Domain | BG1SB (cpp) | 200-entry LRU cache, Flash persist |
-| SWRMeter | Service | ModularTuner | Tandem Match ADC sampling, SWR calc |
-| FrequencyCounter | Service | ModularTuner | TIM4 hardware capture |
-| flashstruct | Service | ModularTuner | STM32 internal Flash read/write |
-| PostRunner | Service | BG1SB (cpp) | 4-phase POST with Vrefint self-check |
-| DiagMonitor | Service | BG1SB (cpp) | Runtime fault detection, health FSM |
+| Component | Source | Responsibility |
+|-----------|--------|----------------|
+| atu_main | BG1SB (C) | app_main, task creation, LED heartbeat |
+| ws_client | BG1SB (C, 350行) | WiFi+WS管理, JSON分派 |
+| tune_engine | BG1SB (C, 250行) | 调谐状态机 |
+| servo_ctrl | BG1SB (C, 100行) | PWM+MOSFET |
+| nvs_cache | BG1SB (C, 120行) | 频率缓存持久化 |
+| health_mon | BG1SB (C, 100行) | 健康巡检 |
+| protocol | BG1SB (C, 150行) | JSON序列化/反序列化 |
+| cJSON | DaveGamble (C, 3100行) | JSON解析库 v1.7.18 |
 
-## 11.2 Interaction Sequence: Auto-Tune
+## 11.2 End-to-End Auto-Tune Sequence
 
 ```
-loop()                 CapBank        SWRMeter       TuneCache
-  │                       │               │              │
-  │ fwd_pwr in [0.5,15]   │               │              │
-  │ cap_sweep_tune()      │               │              │
-  ├──────────────────────►│               │              │
-  │  for c=0..127:        │               │              │
-  │    setValue(c)        │               │              │
-  │    delay(12ms)        │               │              │
-  │    sampleSWR() ───────┼──────────────►│              │
-  │    check fwd_pwr      │               │              │
-  │    if swr < min → upd │               │              │
-  │  setValue(best_c)     │               │              │
-  │  save(freq, best_c) ──┼───────────────┼─────────────►│
-  │◄──────────────────────┤               │              │
+Browser        MRRC Server        ATR1000        ESP32-S3 ATU     Servo
+  │                │                  │                │             │
+  ├─"Tune"────────→│                  │                │             │
+  │                ├─read SWR────────→│                │             │
+  │                │←─SWR=2.8────────┤                │             │
+  │                ├─tune_start WS───────────────────→│             │
+  │                │  {freq,swr,pwr}                  │             │
+  │                │                  │                ├─NVS查→miss  │
+  │                │                  │                ├─power_on───→│
+  │                │                  │                ├─set_angle(0)→│
+  │                │←─tune_progress───────────────────┤             │
+  │                │  {cap_pct,pos,state}            │             │
+  │                ├─read SWR────────→│                │             │
+  │                │←─SWR=2.4────────┤                │             │
+  │                ├─swr_update WS───────────────────→│             │
+  │                │                  │                ├─记录min     │
+  │                │                  │                ├─step→+5°   →│
+  │                │  ... (重复36步) ...              │             │
+  │                │←─tune_progress───────────────────┤             │
+  │                │                  │                │             │
+  │                │  ... (如果SWR>1.5, 细扫30步) ... │             │
+  │                │                  │                │             │
+  │                │←─tune_done───────────────────────┤             │
+  │                │  {cap_pct:67,swr:1.15,ms:3400}   │             │
+  │                │                  │                ├─save NVS    │
+  │                │                  │                ├─power_off──→│
+  │←─UI update─────┤                  │                │             │
+  │  SWR=1.15 ●    │                  │                │             │
 ```
 
 ---
 
-# 12. Operational Model (ART 0522)
+# 12. Operational Model
 
 ## 12.1 Deployment Topology
 
 ```
 INDOOR:  [Radio]──[Bias-T Box: C+choke+13.8V]──coax 20m──┐
-OUTDOOR:                                                  │
-  ┌─ IP66 AL Box 160×110×70mm ───────────────────────────┐│
-  │  Bluepill → ULN2003A → 7×G5Q-14 → 10×1812 MLCC      ││
-  │  SWRMeter (FT37-43) → 10k+10k divider → STM32 ADC    ││
-  │  T200-2B×2 2T:13T → HV_BUS(5mm) → M5 Ant Terminal ──┘│
-  │  GDT + 2.2MΩ bleeder + 1.5mm breather hole           │
-  └──────────────────────────────────────────────────────┘
-                      │
-          Counterpoise 2m → free-hanging
+                                                           │
+OUTDOOR:                                                   │
+  ┌─ IP66 AL Box 160×110×70mm ─────────────────────────────┤
+  │                                                        │
+  │  SO-239 → 10nF×2 → T200-6(2:14T) → Air Var Cap → ANT M5
+  │                                         │               │
+  │                                    MG996R Servo         │
+  │                                         │               │
+  │  ┌─ PCB 140×50mm ─────────────────────┐│               │
+  │  │ ESP32-S3 + LM2940 + LM2596 + AMS1117│               │
+  │  │ IRF9540 MOSFET (伺服VCC开关)        │               │
+  │  │ GDT (90V) + 2.2MΩ bleed             │               │
+  │  └─────────────────────────────────────┘│               │
+  │  1.5mm breather hole + desiccant       │               │
+  └─────────────────────────────────────────┘               │
+                      │                                      │
+          Counterpoise 2m → free-hanging                     │
 ```
 
 ## 12.2 Runtime Loop
 
+Each FreeRTOS task has its own loop:
+
 ```
-loop() @ ~100Hz:
-  1. sampleSWR() → read fwd_pwr, rev_pwr, swr
-  2. adjustPower(fwd_raw) → if in [0.5, 15]W:
-       if cooldown expired & freq_changed > 50kHz:
-         cap_sweep_tune() OR TuneCache.load()→fine_tune
-  3. Every 10s: diagMon.runChecks()
-  4. Serial commands: "status", "tune", "bypass"
+ws_client_task:
+  block on send_queue (100ms timeout)
+  → dequeue → esp_websocket_client_send_text()
+  → every 60s: send status_report
+
+tune_engine_task:
+  block on delay (100ms) — purely event-driven
+  → all work happens in tune_engine_feed_swr() callback
+
+health_mon_task:
+  every 10s: health_mon_tick()
+  → ADC read → temp read → FSM update → alert if degraded
+
+app_main (main loop):
+  every 5s: LED = ws_client_is_connected() ? ON : fast-blink
 ```
 
 ## 12.3 Failure Recovery
 
 | Event | Recovery |
 |-------|----------|
-| WDT reset | Boot → POST → load last-known C from Flash |
+| WDT reset | Boot → POST → reconnect WiFi → reload NVS |
 | Brown-out | BOR reset → same as WDT |
-| 1-2 relays stuck | DEGRADED: exclude failed bits, continue tuning |
-| ≥3 relays failed | SAFE: all OFF, lock last C, no auto-tune |
-| CRITICAL fault | SAFE: immediate all-relays-OFF |
+| WiFi disconnect | Auto-reconnect every 10s; LED fast blink |
+| WebSocket disconnect | Auto-reconnect after 3s; send queue drains |
+| Servo stall | 3 retries → tune_error → servo power off |
+| NVS corruption | Auto-erase partition + reinit |
+| OTA failure | Bootloader auto-rollback to previous slot |
 
 ---
 
-# 13. Feasibility Assessment (ART 0530)
+# 13. Feasibility Assessment
 
 ## 13.1 Technical Risks
 
 | Risk | Mitigation |
 |------|------------|
-| 3.3V ADC overvoltage from SWR bridge | 10k+10k divider limits max to 1.65V |
-| ModularTuner code compilation on STM32duino | Widely tested; Bluepill is ModularTuner's target platform |
-| T200-2B core saturation | B_peak=5.6mT vs B_sat=800mT (143× margin) |
-| G5Q-14 hot-switch | Firmware power gate: >15W → bypass, no relay switching |
+| WiFi 室外稳定性 | 2.4GHz PCB天线; 距路由器30m内; 自动重连 |
+| 伺服齿轮卡死 | 堵转检测(3次位置不变→告警→断电) |
+| 可变电容打火 | 空气介质, 1kV耐压, 100W时峰值仅700V |
+| T200-6 饱和 | B_peak 12.7mT vs 600mT饱和 (47×裕度) |
+| 空气可变电容货源 | 拆机件(廉价但品控不一); 建议最终切换到国产新品 |
 
 ## 13.2 Resource Budget
 
 | Resource | Budget | Used | Free |
-|----------|--------|------|------|
-| Flash | 64KB | ~20KB | 69% |
-| RAM | 20KB | ~3KB | 85% |
-| GPIO | 37 | 16 | 21 |
-| ADC channels | 10 | 3 | 7 |
-| Cost | ¥400 | ~¥390 | On budget |
+|----------|:------:|:----:|:----:|
+| Flash | 16MB | ~1.2MB (固件+OTA双槽) | 92% |
+| SRAM | 512KB | ~80KB (3 task stacks + cJSON) | 84% |
+| GPIO | 45 | ~8 | 37 |
+| ADC channels | 20 | 1 | 19 |
+| NVS tune cache | 24KB | ~16KB (2000条目 × 8B) | 33% |
+| Cost | ¥300 | ~¥255 | On budget |
 
 ---
 
@@ -563,20 +637,20 @@ loop() @ ~100Hz:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| V0.1 | 2026-06-07 | Initial engineering design (PIC16F1938) |
-| V0.2 | 2026-06-08 | PIC16 firmware v1.0 (8 compile units) |
-| V1.0 | 2026-06-08 | IBM TeamSD 14-chapter SDD + Palantir FDE (PIC16) |
-| **V2.0** | **2026-06-08** | **Full STM32F103 migration** |
-| | | MCU: STM32F103C8T6 Bluepill |
-| | | Firmware: ModularTuner reuse (SWR/Freq/Flash) |
-| | | New: CapBank GPIO direct-drive |
-| | | ADC: 12-bit 3.3V with divider network |
-| | | Power: LM2940 LDO + AMS1117-3.3 |
-| | | Core: T200-2B ×2 (Carbonyl E, μ=10) |
-| | | Memory: 20KB RAM / 64KB Flash / 200-entry cache |
-| | | Cost: ~¥390 |
+| V1.0 | 2026-06-07 | PIC16F1938 工程设计 |
+| V2.0 | 2026-06-08 | STM32F103 + ModularTuner 复用 |
+| **V3.0** | **2026-06-08** | **Fuchs ATU 全面重构** |
+| | | MCU: ESP32-S3-WROOM-1 (240MHz 双核) |
+| | | Core: T200-6 ×1 (μ=8) + 空气可变电容 + MG996R |
+| | | SWR: 远程ATR1000 (无板载SWR桥) |
+| | | 通信: WiFi WebSocket → MRRC 集成 |
+| | | 电容: 伺服连续替代继电器步进 (128档→连续) |
+| | | PCB: 140×50mm (90mm→50mm, -44%) |
+| | | 固件: ESP-IDF v5 C (非Arduino) |
+| | | 成本: ¥255 (较V2.0 ¥390 降35%) |
 
 ---
 
 > **关联文档**: [`FDE.md`](FDE.md) · [`../hardware/SCH_Description.md`](../hardware/SCH_Description.md) · [`../hardware/PCB_Description.md`](../hardware/PCB_Description.md)
-> **固件源码**: [`../firmware-stm32/`](../firmware-stm32/)
+> **固件源码**: [`../firmware-esp32/`](../firmware-esp32/)
+> **legacy 固件**: [`../firmware-legacy/stm32/`](../firmware-legacy/stm32/) (V2.0) [`../firmware-legacy/pic/`](../firmware-legacy/pic/) (V1.0)

@@ -1,328 +1,178 @@
-# EFHW Auto Tuner 100W — FDE 模式复盘与提炼
+# EFHW Fuchs ATU V3.0 — Fault Detection & Engineering (FDE)
 
-> Forward Deployed Engineering — 以 Palantir FDE 方法论审视 EFHW 全自动调谐适配器项目
-> 综合来源: AA5TB 原始理论, VA3KOT 实验验证, N7DDC ATU-100 开源框架, 工程设计文档 (1237行), SDD (14章), 固件源码 (10编译单元)
-> 覆盖周期: 2026-05 ~ 2026-06, 从知识库研究到完整工程设计交付
-
----
-
-## 一、什么是 FDE？
-
-**FDE (Forward Deployed Engineering)** 源自 Palantir，是一种**驻场工程师驱动的产品探索与交付模式**。核心理念：
-
-| 维度 | 传统 SaaS (PMF) | FDE 模式 |
-|------|----------------|---------|
-| 交付物 | 标准化软件许可证 | 可衡量的**成果 (Outcome)** |
-| 团队位置 | 总部远程 | **驻扎客户现场** |
-| 工作方式 | 产品→销售→客户 | 工程师直接对接→构建→抽象 |
-| 扩展逻辑 | 减少每个客户定制工作量 | 提高**交付成果的价值** |
-| 合同规模 | 可重复的小额合同 | 随价值递增的大额合同 |
-| 产品团队角色 | 直接做功能 | 把现场"碎石路"抽象为"高速公路" |
-
-**核心公式：**
-
-```
-FDE = Echo(需求发现) + Delta(原型交付) + Product(抽象泛化)
-```
-
-- **Echo 团队**：嵌入式分析师，深入用户场景，定义有价值的 demo/use case，同时是客户关系管理者
-- **Delta 团队**：部署工程师，擅长快速原型，在时间线内以软件形式交付成果
-- **Product 团队**：总部产品/工程，把现场做法抽象为可服务接下来 5-10 个客户的通用能力
-
-**FDE 不是咨询**：咨询是一次性服务，FDE 是产品探索过程。FDE 在现场铺"碎石路"，总部修"高速公路"。交付成果的单位价值成本随时间下降，利润率从负转正。
+> **Document ID**: FDE-EFHW-FUCHS-V3.0
+> **Version**: V3.0
+> **Date**: 2026-06-08
+> **Status**: Released
+> **MCU**: ESP32-S3-WROOM-1
 
 ---
 
-## 二、EFHW Tuner 项目的 FDE 角色映射
+## 1. Fault Catalog
 
-在本项目中，三个角色由 BG1SB 在不同时间段切换承担：
+| F# | Component | Fault Mode | Detection | Response |
+|----|-----------|-----------|-----------|----------|
+| F01 | MG996R Servo | Stall (齿轮卡死/堵转) | Position unchanged 3× after set_angle() | Cut power, tune_error (stall), SYS_DEGRADED |
+| F02 | MG996R Servo | Stripped gear (空转) | SWR不随位置变化(需MRRC检测) | tune_error (no_match) |
+| F03 | IRF9540 P-MOSFET | Short (伺服VCC常通) | 伺服空闲时有动作噪音 | Log alert, 不影响功能 |
+| F04 | IRF9540 P-MOSFET | Open (伺服永远断电) | tune_engine detects consecutive stall | tune_error (stall), SYS_DEGRADED |
+| F05 | 2N2222A NPN | Open (栅极无法拉低) | MOSFET不导通 → 伺服无电 | tune_error (stall) |
+| F06 | T200-6 Core | Saturation (大功率/低频) | 匹配失效, SWR突变 | B_peak校核已排除此风险(47×裕度) |
+| F07 | Variable Capacitor | Arc-over (打火/极板短路) | SWR = ∞ (全反射) | GDT保护, 物理恢复后需重启 |
+| F08 | LM2596 DC-DC | Overheat/失效 | 6V轨跌落, 伺服无力 | tune_error(stall) |
+| F09 | AMS1117-3.3 LDO | 失效 | ESP32-S3 掉电 → WDT reset | Auto reboot |
+| F10 | WiFi connection | Disconnect | WIFI_EVENT_STA_DISCONNECTED | Auto reconnect every 10s |
+| F11 | WebSocket | Disconnect | WEBSOCKET_EVENT_DISCONNECTED | Auto reconnect every 3s |
+| F12 | NVS Partition | Corruption | nvs_flash_init fails | Auto erase + reinit |
+| F13 | NVS Write | Flash worn | nvs_set_u8 returns error | Log, continue with RAM cache |
+| F14 | Bias-T Voltage | Under-voltage (<10V) | ADC1_CH4 | health_alert → SYS_DEGRADED |
+| F15 | Bias-T Voltage | Over-voltage (>15V) | ADC1_CH4 | health_alert → SYS_DEGRADED |
+| F16 | Core Temperature | >80°C | Internal temp sensor | health_alert → disable auto-tune |
+| F17 | Task WDT | Task hung > 5s | ESP Task WDT panic | Auto reset |
+| F18 | cJSON Parse | Malformed JSON | cJSON_Parse returns NULL | Silent discard, no crash |
+| F19 | Send Queue | Full (16 pending) | xQueueSend timeout | Drop oldest message |
 
-| FDE 角色 | EFHW Tuner 对应行为 | 典型时间段 |
-|---------|-------------------|-----------|
-| **Echo (需求发现)** | 研究 AA5TB 理论、VA3KOT 实验、社区痛点 (手动调谐不可行)，定义自动化目标 | 2026-05-24 ~ 2026-06-06 |
-| **Delta (原型交付)** | 工程设计文档 (Netlist/PCB规范/BOM)、固件源码 (10编译单元)、Bias-T 设计 | 2026-06-07 ~ 2026-06-08 |
-| **Product (抽象泛化)** | IBM TeamSD 14章 SDD、Palantir FDE 复盘、诊断/POST 框架可复用设计 | 2026-06-08 |
+**V2.0→V3.0 变化**: 删除继电器相关故障(G5Q-14×7, ULN2003A), 删除SWR桥故障(BAT41, FT37-43), 删除ADC卡死故障。新增: 伺服故障(F01-F02), MOSFET故障(F03-F05), WiFi/WS故障(F10-F11), JSON解析故障(F18)。
+
+## 2. Top 5 FMEA
+
+### F01: MG996R Servo Stall (RPN=60)
+
+| Item | Detail |
+|------|--------|
+| Failure Mode | 齿轮/轴承卡滞, 电机无法转动 |
+| Effect | 调谐中断, 无法改变电容 |
+| Cause | 低温润滑失效(-20°C), 异物进入, 齿轮磨损 |
+| Detection | servo_detect_stall(): 3次 set_angle 后位置不变 |
+| Severity/Occurrence/Detection | S:5 (无法调谐), O:3, D:4 |
+| RPN | 5×3×4 = 60 |
+| Mitigation | 伺服断电 → tune_error(stall) → 定期维护/润滑 |
+
+### F04: IRF9540 Open (RPN=40)
+
+| Item | Detail |
+|------|--------|
+| Failure Mode | MOSFET 漏极开路, 伺服6V轨断开 |
+| Effect | 伺服不通电, 调谐失败 |
+| Cause | EOS/ESD, 过流烧毁, 栅极氧化层击穿 |
+| Detection | tune_engine 检测到连续stall |
+| RPN | 5×2×4 = 40 |
+| Mitigation | 选型裕度(IRF9540 -100V/-23A远大于6V/3A); 栅极10kΩ下拉保护 |
+
+### F10: WiFi Disconnect (RPN=36)
+
+| Item | Detail |
+|------|--------|
+| Failure Mode | WiFi信号丢失 (距离/干扰/路由器重启) |
+| Effect | MRRC无法控制ATU; 本地缓存仍可用 |
+| Detection | WIFI_EVENT_STA_DISCONNECTED |
+| RPN | 4×3×3 = 36 |
+| Mitigation | Auto reconnect 10s间隔; LED闪烁指示; 缓存不依赖WiFi |
+
+### F12: NVS Corruption (RPN=28)
+
+| Item | Detail |
+|------|--------|
+| Failure Mode | NVS partition 数据损坏 (掉电时写入) |
+| Effect | 缓存丢失 → 冷启动需全扫描重建 |
+| Detection | nvs_flash_init returns error |
+| RPN | 4×2×4 = 28 |
+| Mitigation | Auto erase + reinit |
+
+### F14: Bias-T Under-voltage (RPN=18)
+
+| Item | Detail |
+|------|--------|
+| Failure Mode | DC供电<10V (线路损耗/电源故障) |
+| Effect | 伺服无力, ESP32可能欠压 |
+| Cause | Bias-T电源故障, 同轴过长压降大 |
+| RPN | 3×2×3 = 18 |
+| Mitigation | health_alert → SYS_DEGRADED → 限制调谐 |
+
+## 3. POST (3-Phase)
+
+| Phase | Check | Method | Failure Action |
+|-------|-------|--------|---------------|
+| PHASE_0: DC | ESP32-S3 3.3V 供电正常 | 代码能执行 = 供电OK | — |
+| PHASE_1: WiFi | WiFi STA initialized | esp_wifi_init check | Retry 3次 → LED fast blink |
+| PHASE_2: Servo | 伺服范围测试 | set_angle(90°)→delay→set_angle(0°) | 失败=SYS_DEGRADED |
+
+## 4. Health State Machine
+
+```
+  POST PASS ──▶ SYS_HEALTHY
+                    │
+     servo stall 3次 / bias voltage / core temp >80°C
+                    ▼
+               SYS_DEGRADED (仍可调谐, 仅告警)
+                    │
+     连续3次 tune fail / WDT触发
+                    ▼
+               SYS_SAFE (伺服归零, 禁止自动调谐)
+                    │
+     ONLY exit: power cycle + POST pass
+```
+
+## 5. Degradation Strategies
+
+| Condition | Strategy |
+|-----------|----------|
+| 1-2次 tune fail | 允许重试, 清除 cooldown |
+| 3次 consecutive tune fail | SYS_SAFE → 伺服归零 → 禁止自动调谐 |
+| WiFi disconnect | 不影响本地缓存; 仅限制远程命令 |
+| NVS cache miss | 全扫描建立新缓存 (~8s) |
+| Bias-V out of range | DEGRADED: 仅告警, 不限制 (可能为暂时波动) |
+| Core temp >80°C | 禁止自动调谐, wait cooldown, 每30s重检 |
+
+## 6. Fault Injection Test Cases
+
+| Test | Method | Expected |
+|------|--------|----------|
+| Servo stall | 物理卡住伺服臂, 触发 tune_start | tune_error(stall), MOSFET断电, SYS_DEGRADED |
+| WiFi disconnect | 关闭路由器 | LED fast blink, auto reconnect |
+| Bias under-voltage | 降低Bias-T电源到9V | health_alert, SYS_DEGRADED |
+| NVS corruption | Erase nvs_tune partition mid-write | Auto reformat, cold sweep |
+| Malformed JSON | Send invalid JSON to /atu WS | Silent discard, no crash |
+| Overpower during tune | fwd_pwr_w=100 | tune_error(overpower), servo to zero |
+| RF lost during tune | fwd_pwr_w=0.1 | tune_error(no_rf), servo to zero |
+| Send queue full | Flood 32 messages | Queue oldest drop, system stable |
+
+## 7. Diagnostic Data
+
+`get_status` response: `{pos, cache_hits, health, uptime}`
+
+UART0 debug (115200bps): servo position, NVS stats, WiFi RSSI, Bias-V, core temp via esp_log.
+
+## 8. MTBF Estimation
+
+| Component | λ (FIT) | Qty | Total FIT |
+|-----------|:-------:|:---:|:---------:|
+| ESP32-S3 module | 200 | 1 | 200 |
+| MG996R servo | 500 | 1 | 500 |
+| IRF9540 MOSFET | 50 | 1 | 50 |
+| LM2596 DC-DC | 100 | 1 | 100 |
+| LM2940CT LDO | 50 | 1 | 50 |
+| AMS1117 LDO | 30 | 1 | 30 |
+| 2N2222A NPN | 20 | 2 | 40 |
+| T200-6 core | 5 | 1 | 5 |
+| Variable capacitor | 300 | 1 | 300 |
+| GDT | 10 | 1 | 10 |
+| Passives (~25 R/C) | 2 | 25 | 50 |
+| Solder joints (~100) | 1 | 100 | 100 |
+| **Total** | | | **1,435 FIT** |
+
+MTBF ≈ 1×10^9 / 1435 ≈ **697,000 hours ≈ 80 years** (不含极端环境加速因子)
+
+## 9. Maintenance Schedule
+
+| Interval | Action |
+|----------|--------|
+| Monthly | 检查 SWR 曲线(MRRC趋势), 确认齿轮无异响 |
+| 6-month | 开壳检查: 齿轮磨损、接线松动、GDT 状态、干燥剂 |
+| Annual | 抽检 NVS 缓存完整性, 检查防水密封 |
+| On fault | MRRC health_alert → 按FMEA指示修复 |
 
 ---
 
-## 三、FDE Cycle 全景
-
-```
-2026-05            2026-06-06          2026-06-07            2026-06-08
-  ┃                   ┃                   ┃                     ┃
-  ▼                   ▼                   ▼                     ▼
-┌──────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│ Cycle 1  │    │   Cycle 2    │    │   Cycle 3    │    │   Cycle 4    │
-│ 知识积累 │    │ 理论融合      │    │ 工程落地      │    │ 体系化       │
-│          │    │              │    │              │    │              │
-│ EFHW知识 │    │ AA5TB+ATU-100│    │ PCB+BOM+FW   │    │ SDD+FDE      │
-│ 库建设   │    │ 理论融合      │    │ 全栈交付      │    │ 14章+复盘    │
-│ ~2周     │    │ ~1天          │    │ ~1天          │    │ ~1天          │
-└──────────┘    └──────────────┘    └──────────────┘    └──────────────┘
-                                                                      │
-                                                          ┌───────────┘
-                                                          ▼
-                                                    ┌──────────────┐
-                                                    │   待推进      │
-                                                    │              │
-                                                    │ Cycle 5:     │
-                                                    │ PCB 打样     │
-                                                    │ Cycle 6:     │
-                                                    │ 台架测试     │
-                                                    │ Cycle 7:     │
-                                                    │ 现场验证     │
-                                                    └──────────────┘
-```
-
-**关键观察**：这是一个高度压缩的 FDE 过程——4 个 Cycle 在约 2 周内完成，从零知识到完整的开源工程设计交付。之所以能如此快，是因为大量复用了前人的 FDE 成果（AA5TB 理论、N7DDC ATU-100 固件框架），以及 AI 辅助的工程化能力。
-
----
-
-## 四、各 FDE Cycle 详细复盘
-
-### Cycle 1: 知识积累 (2026-05-24 ~ 2026-06-06)
-
-**Outcome**: 建立 EFHW 天线知识库，覆盖从 49:1 宽带变压器到 AA5TB LC 耦合器的完整理论谱系。
-
-| FDE 阶段 | 活动 | 产出 |
-|---------|------|------|
-| **Echo** | 调研社区现状：ON6URE VNA 实测 (49:1 高频崩溃)、N6CC 方向图分析、PA9X TX/RX 分离、W8JI 绕法纠正 | 识别核心痛点：宽带铁氧体变压器在高低频端同时失效 |
-| **Delta** | 定量分析：DMEGC Ni-Zn vs FT240-43 磁芯损耗对比 (Ae=350 vs 161 mm²)、AA5TB MININEC 建模还原 (0.05λ counterpoise 法则) | `dmegc_nizn_toroid.md`, `aa5tb_efha_analysis.md` |
-| **Product** | 建立知识库目录结构：README.md (13节) + 9 个 references/*.md 文件 | EFHW 理论全景图, A+C 双模系统分析 |
-
-**技术选型决策**：
-
-| 决策 | 方案 | 备选 | 理由 |
-|------|------|------|------|
-| 效率基准 | AA5TB 并联 LC 耦合器 | 49:1 宽带变压器, L-Network | 粉末铁芯 HF 全段 Q>150, 铁氧体 14MHz 以上 Q 崩塌 |
-| 磁芯材料 | T200-2 (羰基铁粉 μ=10) | DMEGC Ni-Zn (μ=1000), FT240-43 (μ=850) | 极低高频损耗, 极高抗饱和能力 |
-| 调谐元件 | 可变电容 → 待自动化 | Polyvaricon, 真空电容, 继电器+固定MLCC | Cycle 2 中决定 |
-
-**版本产出**: `efhw-knowledge/` 知识库 V1.0 (6篇深度分析, ~2,800行)
-
----
-
-### Cycle 2: 理论融合 (2026-06-06 ~ 2026-06-07)
-
-**Outcome**: 将 AA5TB 并联 LC 耦合器理论与 N7DDC ATU-100 开源框架融合，提出"全自动纯电容调谐"架构。
-
-| FDE 阶段 | 活动 | 产出 |
-|---------|------|------|
-| **Echo** | 识别"手动调谐"为 AA5TB 方案的最大痛点。对照 ATU-100 的 L-C 二维扫描算法，发现 EFHW 场景不需要电感调谐 | 核心洞察：**纯电容调谐 = AA5TB 效率 + ATU-100 自动化** |
-| **Delta** | 定量验证 T200-2 100W 安全性 (B_peak=5.6mT vs B_sat=800mT → 143×裕度), 谐振环流 2.6A RMS, C0G vs X7R 介质的决定性差异 | 核心工程数据表 |
-| **Product** | 87KB 完整工程设计文档 (12章): Netlist, PCB 布局规范, 固件伪代码, BOM, 室外耐候性方案 | `auto_efhw_tuner_design_full.md` |
-
-**碎石路 → 高速公路**：
-
-```
-碎石路: AA5TB 手动 LC 耦合器 → 每换频段走到室外拧电容 → FT8多频段不可行
-    ↓ 自动化抽象
-高速公路: 7位128档电容阵列 + PIC16F1938 自动扫描 → <2s 锁定 → Bias-T 远程供电 → 完全不动手
-```
-
-**关键工程发现**：
-
-| 发现 | 影响 | 来源 |
-|------|------|------|
-| T200-2 B_peak=5.6mT @ 100W/40m | 磁饱和风险 = 0 → 双叠不是必须但有裕度 | 法拉第定律定量计算 |
-| 谐振环流 2.6A RMS | C6/C7 必须多只并联 → 10只 MLCC 的分配方案 | Q_loaded × I_ant 计算 |
-| ULN2003A COM 脚浮空 = 64V 反峰 | 原理图上红色粗线标注 | 社区故障案例 + 反峰公式 |
-| G5Q-14 非 RF 额定 | 固件必须含功率检测 → 热切换保护 | 继电器数据手册分析 |
-
-**版本产出**: `auto_efhw_tuner_design_full.md` V1.0 (1,237行, 12章)
-
----
-
-### Cycle 3: 工程落地 (2026-06-07 ~ 2026-06-08)
-
-**Outcome**: 全栈交付——固件源码、BOM、KiCad 指南、装配测试手册。
-
-| FDE 阶段 | 活动 | 产出 |
-|---------|------|------|
-| **Echo** | 分析 ATU-100 源码结构 (GitHub: N7DDC/ATU-100)，确定代码修改范围和兼容性策略 | 4个关键修改点: 纯C扫描, 热切换保护, EEPROM 布局, POST 自检 |
-| **Delta** | 编写 8 个编译单元 (~1,500行 C 源码): main, tuning, swr_bridge, eeprom, display + BOM.csv (70+行) + KiCad 指南 + 装配手册 | 完整的可直接编译/采购/制造的工程包 |
-| **Product** | 项目目录结构标准化 (`firmware/`, `hardware/`, `docs/`, `bias-tee/`)，开源许可 (GPL-3.0 / CERN-OHL-S 2.0) | `auto-efhw-tuner/` 项目骨架 |
-
-**技术选型决策**：
-
-| 决策 | 方案 | 备选 | 理由 |
-|------|------|------|------|
-| MCU | PIC16F1938 | ATmega328P, STM32F103 | ATU-100 固件兼容, 11ch ADC, 25 GPIO, -40~+85°C |
-| 电容介质 | C0G/NPO | X7R | **零DC偏压降容, 零老化, 零压电效应** — X7R 在3KV下降容 50-80% |
-| 继电器 | G5Q-14 DC12 | AQY221 固态, HF32F | 2KV 触点耐压, 10A 额定, 物理断开提供完美 RF 隔离 |
-| SWR 检测 | Tandem Match (KI6WX) | Stockton, 成品双向耦合器 | 经典 ARRL 设计, >25dB 方向性, DIY ¥10 |
-| 供电 | Bias-T 同轴馈电 | 独立电源线, 太阳能+电池 | 零额外布线, 业余无线电标准方案 |
-| 编译工具 | XC8 v2.40 + MPLAB X | SDCC, IAR | Microchip 官方, 免费版支持 -O2 |
-
-**版本产出**: `auto-efhw-tuner/` V0.2 (18 文件, ~2,370行)
-
----
-
-### Cycle 4: 体系化 (2026-06-08)
-
-**Outcome**: 从"爱好者级别"提升到"工程级别"——
-
-| FDE 阶段 | 活动 | 产出 |
-|---------|------|------|
-| **Echo** | 审视项目状态：缺少正式的软件设计文档、缺少系统性的故障分析、缺少运行时诊断 | 识别 3 个工程化缺口 |
-| **Delta** | 新增 diagnostics.c/h (430行) + post.c/h (340行); 升级 main.c (BOR/WDT/POST), tuning.c (GPIO回写+SAFE门控), config.h (故障阈值) | 6 文件新增/升级, 固件从 1,458 行增长到 ~2,000 行 |
-| **Product** | IBM TeamSD 14章 SDD + Palantir FDE 复盘 → 可复用的设计文档模板 | `SDD.md` (~700行), `FDE.md` (本文档) |
-
-**"碎石路 → 高速公路"：诊断框架抽象**
-
-```
-碎石路: 每个项目手动添加 WDT + 简单错误处理
-           ↓ 抽象
-高速公路: 4阶段POST + 运行时诊断 + 3级健康状态机 + EEPROM故障日志环形缓冲
-           → 可复用于任何 PIC16 嵌入式项目
-```
-
-**诊断框架可复用组件**：
-
-| 组件 | 文件 | 可复用性 |
-|------|------|---------|
-| POST 4阶段框架 | `post.c/h` | 适配 pin mapping 和 ADC 通道即可 |
-| 健康状态机 (HEALTHY→DEGRADED→SAFE) | `diagnostics.c/h` | 通用: 任何可降级系统 |
-| ADC 卡死检测 + FVR 自检 | `diagnostics.c` | 通用: 任何 PIC16 ADC 应用 |
-| EEPROM 环形缓冲故障日志 | `diagnostics.c` | 通用: 任何需要故障记录的系统 |
-| GPIO 回写验证 | `tuning.c` | 通用: 任何安全关键 GPIO 输出 |
-| CRC-8 数据完整性校验 | `diagnostics.c` | 通用: Dallas/Maxim 1-Wire CRC |
-
-**版本产出**: `auto-efhw-tuner/` V1.0 (24 文件, 4,617 行, 10 编译单元)
-
----
-
-### Cycle 5: STM32 架构迁移 & 竞品借壳 (2026-06-08)
-
-**Outcome**: 识别 PIC16F1938 平台的限制 (10-bit ADC, 1KB RAM, 无硬件频率计数器), 决定迁移到 STM32F103, 同时复用 ModularTuner 的开源代码。
-
-**触发因素 (Echo)**:
-- 竞品分析: ModularTuner (KW4TI) 已在 STM32F103 上实现了成熟的 Tandem Match 检波和硬件频率计数
-- ATU-100 STM32 Porting 分支验证了 STM32 替代 PIC 的可行性
-- PIC16 10-bit ADC 在 SWR<1.1 时分辨率不足 (ΔSWR 0.05 ≈ 5 LSB)
-- 1KB RAM 无法容纳 200 条调谐缓存
-
-| FDE 阶段 | 活动 | 产出 |
-|---------|------|------|
-| **Echo** | 对比 3 个竞品 (ModularTuner/ATU-100/Antuner), 识别"借壳"策略 | 差异化分析: T200-2B + 3KV MLCC + Bias-T 为独有组合 |
-| **Delta** | Fork ModularTuner → 裁剪 >3,000 行 (LCD/CAT/I2C/无线) → 适配 CapBank 直驱 → 3.3V ADC 分压网络 | `firmware-stm32/` (10 源文件), `SCH/PCB V2.0`, `BOM_STM32.csv` |
-| **Product** | SDD 14 章全面重写 (IBM TeamSD) → FDE 更新 → 文档体系 V2.0 | 全栈 STM32 设计文档 |
-
-**技术选型决策 (Cycle 5 新增)**:
-
-| 决策 | 方案 | 弃用 | 理由 |
-|------|------|------|------|
-| MCU | **STM32F103C8T6** (Bluepill) | PIC16F1938 | 12-bit ADC (4×), 20KB RAM (20×), 硬件测频, $1.5 |
-| 固件基座 | **复用 ModularTuner** SWRMeter/Freq/Flash | 全自写 | ~2,000 行成熟代码, 减少开发和调试时间 80% |
-| GPIO | **CapBank 直驱** (PA8-14+PB3-4) | MCP23017 I2C | 仅需 7 路, 删 I2C 减少故障点 |
-| ADC 适配 | **10k+10k 分压** (3.3V) | 5V 直连 | STM32 ADC 3.3V 最大输入保护 |
-| 12V 稳压 | **LM2940CT-12 LDO** (0.5V 压差) | LM7812 (2.0V 压差) | 保证 Bias-T 13.8V 输入时稳定输出 12V |
-
-**版本产出**: `auto-efhw-tuner/` V2.0 (STM32 全栈, 30+ 文件)
-
-**碎石路 → 高速公路**:
-```
-碎石路: PIC16 8-bit 全自写 → ADC 精度受限, RAM 不足, 开发周期长
-    ↓ 借壳 + 升级
-高速公路: STM32F103 + ModularTuner 复用的 SWRMeter/FreqCounter
-          + CapBank 直驱 + 3.3V 适配 → 12-bit ADC, 200-entry cache,
-          硬件测频, 平台成熟度飞跃
-```
-
----
-
-## 五、FDE 方法论的核心收获
-
-### 5.1 Echo → Delta → Product 节奏
-
-本项目验证了即使在极短时间窗口内（2周），严格的 Echo→Delta→Product 节奏仍然有效：
-
-```
-Cycle 1 (Echo 为主): 充分调研, 不下结论 ← 避免"过早优化"
-Cycle 2 (Delta 为主): 快速原型, 定量验证 ← 所有关键假设必须算一遍
-Cycle 3 (Delta+Product): 工程交付 + 目录化 ← 从"能跑"到"别人能用"
-Cycle 4 (Product 为主): 抽象泛化, 文档体系 ← 从"我的项目"到"可复制的模板"
-**Cycle 5 (Pivot): STM32 架构迁移** ← 从"PIC 自研"到"借壳 ModularTuner"
-```
-
-### 5.2 关键教训
-
-| # | 教训 | 具体例子 | 预防 |
-|---|------|---------|------|
-| 1 | **先算后做** | T200-2 B_peak 计算避免了过度设计 (双叠可能不需要, 但留裕度) | 任何工程假设必须定量验证 |
-| 2 | **社区复用的力量** | AA5TB 理论 (2004), KI6WX Tandem Match (1987), N7DDC ATU-100 (2018) — 每个都是前人的 FDE 成果 | 先找已有方案, 不要重新发明 |
-| 3 | **高压安全不容妥协** | PCB 2.5mm开槽、ULN2003A COM脚标注、G5Q-14 热切换保护 — 都是"不发生则已, 一发生就烧板"的问题 | 安全相关设计必须有双重保护 (硬件+固件) |
-| 4 | **文档即产品** | SDD/FDE 使项目从"一个人的实验"变成"社区的起点" | 工程设计文档和源码同等重要 |
-
-### 5.3 FDE 模式 vs 传统瀑布模式
-
-| 维度 | 瀑布模式 (传统) | FDE 模式 (本项目) |
-|------|---------------|------------------|
-| 理论验证 | 先写完整 spec → 再开发 | 边调研边验证 (Cycle 1→2 迭代) |
-| 原型交付 | 一次交付 | 每个 Cycle 都有可运行产出 |
-| 设计文档 | 开发完成后补写 | 与开发同步, 最后体系化 |
-| 决策修正 | 困难且昂贵 | 每个 Cycle 起点重新评估 |
-| 风险暴露 | 后期测试才发现 | 每个 Cycle 定量验证关键假设 |
-
----
-
-## 六、下一步 FDE Cycles (待推进)
-
-### Cycle 5: PCB 打样验证 (预估 ~2 周)
-
-```
-Echo: 嘉立创/华秋打样 5 片 → 验证 PCB 工艺 (开槽/间距/焊盘)
-Delta: 手工贴片 → 逐个元件焊接 → 直流上电测试
-Product: PCB 设计修正 → 更新 DRC 规则 → 发布 V1.1 硬件版本
-```
-
-### Cycle 6: 台架测试 (预估 ~1 周)
-
-```
-Echo: 6 项台架测试 (DC供电/电容阵列/SWR桥校准/高压耐压/调谐功能/100W满载)
-Delta: 发现的所有 Bug → 固件修正 → 硬件调整
-Product: 测试报告 + 校准参数 + 固件 V1.1
-```
-
-### Cycle 7: 现场验证 (预估 ~4 周)
-
-```
-Echo: 室外安装 → 7×24h FT8 连续运行 → 经历至少 1 次降雨
-Delta: 远程故障日志读取 (未来 UART 接口) → 调谐成功率统计
-Product: 现场验证报告 → V1.2 正式发布
-```
-
----
-
-## 七、FDE 视角下的项目评估
-
-### 7.1 当前成熟度
-
-| 维度 | 评级 | 证据 |
-|------|------|------|
-| 理论完备性 | ⭐⭐⭐⭐⭐ | AA5TB 原始理论 + B_peak 定量计算 + A+C 双模分析 |
-| 工程设计 | ⭐⭐⭐⭐⭐ | Netlist + PCB DRC 规范 + BOM + Bias-T |
-| 固件实现 | ⭐⭐⭐⭐ | 10 编译单元, 含诊断/POST/降级, 待实机验证 |
-| 文档体系 | ⭐⭐⭐⭐⭐ | 14章 SDD + FDE 复盘 + 装配测试手册 |
-| 硬件验证 | ☆☆☆☆☆ | PCB 待制作, 所有元器件待实际焊接测试 |
-| 现场验证 | ☆☆☆☆☆ | 待 Cycle 7 完成 |
-
-### 7.2 "碎石路"到"高速公路"路线图
-
-```
-当前 (V1.0): 单项目 "碎石路" —— EFHW Tuner 专项设计
-                                 │
-                    Cycle 5-7: 实机验证 + 修正
-                                 │
-          未来 (V2.0): "高速公路" —— 可复用框架:
-            - 电容阵列调谐引擎 (适配任何 LC 谐振场景)
-            - 4阶段 POST 模板 (适配任何 PIC16 项目)
-            - 三级健康状态机 (适配任何可降级嵌入式系统)
-            - 完整的 SDD/FDE 文档模板 (适配任何开源硬件项目)
-```
-
----
-
-> **关联文档**: [`SDD.md`](SDD.md) (IBM TeamSD 14章 SDD)
-> **工程设计**: [`../../references/auto_efhw_tuner_design_full.md`](../../references/auto_efhw_tuner_design_full.md)
-> **参考**: MRRC 项目 [`FDE.md`](../../../FDE.md) (Palantir FDE 原始复盘, 208 commits, V1.0→V5.2)
+> **关联文档**: [`SDD.md`](SDD.md) · [`../hardware/SCH_Description.md`](../hardware/SCH_Description.md)
+> **上一版本**: FDE-EFHW-STM32-V2.0 (已存档)
