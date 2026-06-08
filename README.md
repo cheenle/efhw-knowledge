@@ -1,7 +1,7 @@
 # EFHW (End-Fed Half-Wave) 天线知识库
 
 > BG1SB 的 EFHW 天线技术参考知识库
-> 最后更新: 2026-06-07 (新增 100W 全自动谐振式 EFHW 调谐适配器完整工程设计)
+> 最后更新: 2026-06-08 (🆕 V3.0 Fuchs ESP32-S3 全自动伺服调谐 EFHW 适配器)
 
 ---
 
@@ -18,7 +18,8 @@
 9. [NEC 建模与辐射特性](#8-nec-建模与辐射特性)
 10. [DIY 制作指南](#9-diy-制作指南)
 11. [🆕 A+C 双模匹配系统 — 高低波段兼顾新方向](#11-ac-双模匹配系统)
-12. [🆕 100W 全自动谐振式 EFHW 调谐适配器 — 完整工程设计](#12-100w-全自动谐振式-efhw-调谐适配器)
+12. [🆕 V3.0 Fuchs ATU — ESP32-S3 连续伺服调谐 (最新)](#12-v30-fuchs-atu--esp32-s3-连续伺服调谐)
+13. [V1.0/V2.0 自动谐振式 EFHW 调谐适配器 (legacy)](#13-v10v20-自动谐振式-efhw-调谐适配器-legacy)
 
 ---
 
@@ -627,7 +628,51 @@ Phase 4 (长期): 户外可靠性验证
 
 ---
 
-## 12. 🆕 100W 全自动谐振式 EFHW 调谐适配器 — 完整工程设计
+## 12. 🆕 V3.0 Fuchs ATU — ESP32-S3 连续伺服调谐
+
+> **2026-06-08 | 最新版本 | 基于 F5NPV Fuchs 拓扑**
+
+### 设计理念
+
+V3.0 从 STM32F103 + 继电器切换固定电容全面重构为 **ESP32-S3 + 伺服驱动空气可变电容** 的 Fuchs 并联 LC 耦合器。核心洞察：连续调谐胜过 128 档离散步进。
+
+### 关键规格
+
+| 项目 | 规格 |
+|---|---|
+| MCU | ESP32-S3-WROOM-1 (240MHz 双核, 16MB Flash) |
+| 磁芯 | T200-6 单只 (Type 6, μ=8) 2:14 匝比 → 49:1 阻抗变换 |
+| 电容 | 空气可变 10-500pF, 伺服连续驱动 |
+| 频段 | 40m–10m (WARC 全覆盖), 100W PEP |
+| SWR | MRRC ATR1000 远程提供 (无板载SWR桥) |
+| 控制 | WiFi WebSocket → MRRC 深度集成 |
+| 成本 | ~¥255 (较 V2.0 ¥390 降 35%) |
+
+### 文档体系
+
+- 设计规格: [`docs/superpowers/specs/2026-06-08-fuchs-atu-v3-design.md`](docs/superpowers/specs/2026-06-08-fuchs-atu-v3-design.md)
+- 实施计划: [`docs/superpowers/plans/2026-06-08-fuchs-atu-v3-plan.md`](docs/superpowers/plans/2026-06-08-fuchs-atu-v3-plan.md)
+- 固件源码: [`auto-efhw-tuner/firmware-esp32/`](auto-efhw-tuner/firmware-esp32/) (12 源文件, ESP-IDF v5 C)
+- SDD: [`auto-efhw-tuner/docs/SDD.md`](auto-efhw-tuner/docs/SDD.md) (14章 IBM TeamSD)
+- FDE: [`auto-efhw-tuner/docs/FDE.md`](auto-efhw-tuner/docs/FDE.md) (19故障 FMEA)
+- BOM: [`auto-efhw-tuner/hardware/EFHW_TUNER_BOM_FUCHS.csv`](auto-efhw-tuner/hardware/EFHW_TUNER_BOM_FUCHS.csv)
+- MRRC集成: [`../atu_fuchs_handler.py`](../atu_fuchs_handler.py)
+
+### V2.0 → V3.0 核心变化
+
+| 维度 | V2.0 | V3.0 |
+|------|------|------|
+| 电容 | 7位继电器128档 | 伺服连续 |
+| SWR | 板载Tandem Match | 远程ATR1000 |
+| 通信 | 串口 | WiFi WebSocket |
+| 故障点 | 7继电器+ULN+BAT41×2 | 1伺服+1MOSFET |
+| PCB | 140×90mm | 140×50mm |
+
+---
+
+## 13. V1.0/V2.0 自动谐振式 EFHW 调谐适配器 (legacy)
+
+> **2026-06-07 | 已归档到 firmware-legacy/**
 
 > 📄 **完整设计文档**：[`references/auto_efhw_tuner_design_full.md`](references/auto_efhw_tuner_design_full.md)
 > 许可：GPL-3.0 (固件) / CERN-OHL-S 2.0 (硬件)
