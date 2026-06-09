@@ -2,7 +2,6 @@
 
 > **版本**: V3.0 (2026-06-09) — ESP32-S3 + T200-6 + MG996R
 > **适用**: 具备基础焊接与射频测量能力的业余无线电爱好者
-> **上一版本**: V2.0 STM32F103 已归档
 
 ---
 
@@ -257,4 +256,3 @@ R_bleed (2.2MΩ): 并联在 ANT 端子-GND 之间
 ---
 
 > **关联文档**: [`V3_MIGRATION_CHECKLIST.md`](V3_MIGRATION_CHECKLIST.md) · [`SDD.md`](SDD.md) · [`FDE.md`](FDE.md)
-> **上一版本**: V2.0 装配手册 (已归档)

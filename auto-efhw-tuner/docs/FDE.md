@@ -32,8 +32,6 @@
 | F18 | cJSON Parse | Malformed JSON | cJSON_Parse returns NULL | Silent discard, no crash |
 | F19 | Send Queue | Full (16 pending) | xQueueSend timeout | Drop oldest message |
 
-**V2.0→V3.0 变化**: 删除继电器相关故障(G5Q-14×7, ULN2003A), 删除SWR桥故障(BAT41, FT37-43), 删除ADC卡死故障。新增: 伺服故障(F01-F02), MOSFET故障(F03-F05), WiFi/WS故障(F10-F11), JSON解析故障(F18)。
-
 ## 2. Top 5 FMEA
 
 ### F01: MG996R Servo Stall (RPN=60)
@@ -175,4 +173,3 @@ MTBF ≈ 1×10^9 / 1435 ≈ **697,000 hours ≈ 80 years** (不含极端环境�
 ---
 
 > **关联文档**: [`SDD.md`](SDD.md) · [`../hardware/SCH_Description.md`](../hardware/SCH_Description.md)
-> **上一版本**: FDE-EFHW-STM32-V2.0 (已存档)

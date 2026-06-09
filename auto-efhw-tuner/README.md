@@ -3,12 +3,11 @@
 > 基于 F5NPV Fuchs 并联 LC 耦合器理论 × ESP-IDF v5.x 原生 C
 > 硬件许可: CERN-OHL-S 2.0 | 固件许可: GPL-3.0
 > **在线 SDD**: [ybr387rz.mule.page](https://ybr387rz.mule.page/) — 14章完整软件设计规格书
+> **版本历史**: [CHANGELOG.md](CHANGELOG.md)
 
 ## 项目简介
 
 一台**室外架设、Bias-T 同轴馈电、WiFi 远程全自动调谐**的 100W 末端馈电半波天线适配器。ESP32-S3 驱动 MG996R 伺服电机控制空气可变电容连续调谐，SWR 感知完全委托给 MRRC 侧的 ATR1000，ATU 是纯执行机构。
-
-**V2.0 → V3.0 根本变化**: 继电器切换固定电容阵列 → 伺服驱动连续可变电容。板载SWR检测 → 远程ATR1000。STM32F103 串口调试 → ESP32-S3 WiFi WebSocket。
 
 ## 核心技术指标
 
@@ -22,33 +21,21 @@
 | 电容 | 空气可变 10-500pF, 伺服连续驱动 |
 | 调谐方式 | 粗扫 36 步 @5°/步 + 细扫 30 步 @1°/步 |
 | 调谐时间 | < 10s (全扫描) / < 1s (NVS 缓存命中) |
-| SWR 感知 | **无板载 SWR** — 完全由 MRRC ATR1000 远程提供 |
+| SWR 感知 | 无板载 SWR — 完全由 MRRC ATR1000 远程提供 |
 | 通信 | WiFi 2.4GHz WebSocket → MRRC 深度集成 |
 | 供电 | Bias-T 同轴馈电 13.8V DC |
 | 防护 | IP66 铝壳 + 90V GDT + 2.2MΩ 静电泄放 |
-| PCB | 140×50mm (↓44% vs V2.0), 控制+电源板, RF 高压飞线 |
-| 单套成本 | ~¥255 (↓35% vs V2.0 ¥390) |
+| PCB | 140×50mm, 控制+电源板, RF 高压飞线 |
+| 成本 | ~¥255/套 |
 | 固件 | ESP-IDF v5.x C, 12 源文件, ~2800 行 |
-
-## V2.0 → V3.0 核心变化
-
-| 维度 | V2.0 (STM32) | V3.0 (Fuchs) |
-|------|-------------|-------------|
-| MCU | STM32F103 72MHz | ESP32-S3 240MHz 双核 |
-| 电容 | 7位继电器 128 档步进 | 伺服连续 (180°×0.5°) |
-| SWR | 板载 Tandem Match | 远程 ATR1000 → MRRC |
-| 通信 | 串口 | WiFi WebSocket |
-| 磁芯 | T200-2 ×2 双叠 | T200-6 ×1 |
-| 故障点 | 7继电器+ULN2003A+SWR桥 | 1伺服+1MOSFET |
-| PCB | 140×90mm | 140×50mm |
-| 成本 | ¥390 | ¥255 |
 
 ## 目录结构
 
 ```
 auto-efhw-tuner/
 ├── README.md                       ← 本文件
-├── firmware-esp32/                 ← 🆕 V3.0 ESP32-S3 固件
+├── CHANGELOG.md                    ← 版本历史 (V1.0→V2.0→V3.0)
+├── firmware-esp32/                 ← V3.0 ESP32-S3 固件
 │   ├── CMakeLists.txt              ← ESP-IDF 项目构建
 │   ├── sdkconfig.defaults          ← SDK 配置 (WiFi/NVS/分区/WDT)
 │   ├── partitions.csv              ← Flash 分区表 (含 nvs_tune)
@@ -62,20 +49,14 @@ auto-efhw-tuner/
 │       ├── nvs_cache.h/c           ← 频率→位置 ±50kHz 模糊查找 (120行)
 │       ├── health_mon.h/c          ← Bias-V ADC + 核心温度 + 健康FSM (100行)
 │       └── CMakeLists.txt          ← 组件构建
-├── firmware-legacy/                ← 📦 V1.0 PIC + V2.0 STM32 固件 (已归档)
-│   ├── README.md                   ← 归档说明
-│   ├── pic/                        ← V1.0 PIC16F1938 (8文件)
-│   └── stm32/                      ← V2.0 STM32F103 (3文件)
+├── firmware-legacy/                ← V1.0 PIC + V2.0 STM32 固件 (历史归档)
+│   └── README.md
 ├── hardware/                       ← 硬件设计文件
 │   ├── SCH_Description.md          ← V3.0 原理图 (4 Sheet: Power/MCU/HV_Tank/Protection)
 │   ├── PCB_Description.md          ← V3.0 PCB 布局 (140×50mm, 单区地平面)
 │   ├── EFHW_TUNER_BOM_FUCHS.csv    ← V3.0 BOM (ESP32-S3 + T200-6 + MG996R)
-│   ├── EFHW_TUNER_BOM_STM32.csv    ← V2.0 BOM (legacy 参考)
-│   ├── EFHW_TUNER_BOM.csv          ← V1.0 BOM (legacy 参考)
-│   ├── KiCad_schematic_guide.md    ← V2.0 KiCad 指南 (legacy 参考, 待更新)
-│   ├── nano_banana_prompts.md      ← V2.0 PCB 可视化 Prompt (legacy 参考)
 │   └── simulation/                 ← SPICE + 解析仿真
-│       ├── README.md               ← V3.0 仿真索引 (LC/热/Bias-T/PCB)
+│       ├── README.md               ← 仿真索引 (LC/热/Bias-T/PCB)
 │       ├── lc_resonant_tank_analysis.md  ← T200-6 LC 解析分析
 │       ├── lc_resonant_tank_analysis.py  ← Python 谐振计算脚本
 │       ├── thermal_analysis.md     ← 热分析 (T200-6/MOSFET/DC-DC/伺服)
@@ -124,15 +105,15 @@ auto-efhw-tuner/
 | 装配手册 | 工具清单 → 焊接 → 磁环绕制 → 伺服安装 → 测试 | [`docs/assembly_test_manual.md`](docs/assembly_test_manual.md) |
 | 原理图 | 4 Sheet: Power/MCU/HV_Tank/Protection (Netlist 级) | [`hardware/SCH_Description.md`](hardware/SCH_Description.md) |
 | PCB 布局 | 140×50mm 坐标级规格 + DRC 规则 | [`hardware/PCB_Description.md`](hardware/PCB_Description.md) |
-| BOM | 完整物料清单 V3.0 | [`hardware/EFHW_TUNER_BOM_FUCHS.csv`](hardware/EFHW_TUNER_BOM_FUCHS.csv) |
+| BOM | 完整物料清单 | [`hardware/EFHW_TUNER_BOM_FUCHS.csv`](hardware/EFHW_TUNER_BOM_FUCHS.csv) |
 | 仿真 | LC 谐振/热分析/Bias-T/PCB 传输线 | [`hardware/simulation/`](hardware/simulation/) |
 | Bias-T 设计 | 室内注入盒独立子设计 | [`bias-tee/bias_tee_design.md`](bias-tee/bias_tee_design.md) |
-| Legacy 归档 | V1.0 PIC + V2.0 STM32 固件及设计文档 | [`firmware-legacy/`](firmware-legacy/) |
+| 版本历史 | V1.0 PIC → V2.0 STM32 → V3.0 Fuchs | [`CHANGELOG.md`](CHANGELOG.md) |
+| 历史固件 | V1.0 PIC + V2.0 STM32 源码归档 | [`firmware-legacy/`](firmware-legacy/) |
 
 ## 关联项目文件
 
 - `../README.md` — EFHW 综合知识库 (EFHW 原理, 磁芯选型, V3.0 Fuchs ATU 总览)
-- `../references/auto_efhw_tuner_design_full.md` — V1.0/V2.0 完整工程设计 (legacy 参考)
 - `../references/aa5tb_efha_analysis.md` — AA5TB 原始理论深度解析
 - `../atu_fuchs_handler.py` — MRRC 侧 Fuchs ATU WebSocket handler
 
@@ -145,5 +126,5 @@ auto-efhw-tuner/
 
 ---
 
-> 🏗️ 状态: 固件 V1.0 完成 (12源文件, ~2800行C) | PCB 待打样 | 台架测试待进行
+> 🏗️ 状态: 固件完成 (12源文件, ~2800行C) | PCB 待打样 | 台架测试待进行
 > 📅 最后更新: 2026-06-09

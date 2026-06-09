@@ -33,12 +33,6 @@
    板固定孔: Ø3.2mm ×4 (四角)
 ```
 
-**V2.0→V3.0 关键变化**:
-- 板尺寸从 140×90mm 缩小为 140×**50mm** (节省 44% 面积)
-- 无 B区/A区 分隔 — 无高压隔离槽 (RF 高压不在 PCB 上)
-- 继电器、高压电容、SWR桥全部删除 → PCB 仅为控制+电源板
-- T200-6、可变电容、伺服电机均为 **板上安装(chassis mount)**, PCB 仅提供 3-pin 伺服排针
-
 ### 1.2 板上元件 vs 板外元件
 
 | 位置 | 器件 |
@@ -211,4 +205,3 @@ T200-6 次级热端 → (飞线) → 可变电容定片 → (飞线) → ANT M5 
 ---
 
 > **关联文档**: [`SCH_Description.md`](SCH_Description.md) · [`EFHW_TUNER_BOM_FUCHS.csv`](EFHW_TUNER_BOM_FUCHS.csv)
-> **上一版本**: PCB-EFHW-STM32-V2.0 (已存档为 legacy 参考)

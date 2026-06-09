@@ -2,22 +2,18 @@
 
 > **版本**: V3.0 (2026-06-09) — ESP32-S3 + T200-6
 > **引擎**: ngspice (未安装) → 解析计算 (Python + Fourier)
-> **V2.0 文件**: .cir 网表为 V2.0 格式, 已归档备用
 
 ---
 
 ## 仿真文件索引
 
-| # | 文件 | 仿真对象 | V3.0 状态 |
-|---|------|---------|:---------:|
-| 1 | `lc_resonant_tank_analysis.md` | **T200-6 LC 解析分析** (频率覆盖/Q值/效率/电容耐压) | ✅ V3.0 |
-| 2 | `lc_resonant_tank_analysis.py` | **Python 谐振计算脚本** (运行 `python3 lc_resonant_tank_analysis.py`) | ✅ V3.0 |
-| 3 | `thermal_analysis.md` | **热分析** (T200-6, MOSFET, DC-DC, 伺服) | ✅ V3.0 |
-| 4 | `bias_tee_spice.cir` | Bias-T 同轴馈电 (RF+DC) | ✅ 保持 (Bias-T 未变) |
-| 5 | `pcb_transmission_lines.md` | PCB 传输线参数 | ⚠️ 需更新 (PCB 缩小) |
-| 6 | `lc_resonant_tank.cir` | ~~T200-2 继电器阵列~~ (V2.0 已归档) | ❌ 不适用于 V3.0 |
-| 7 | `swr_bridge_spice.cir` | ~~Tandem Match SWR 桥~~ (V3.0 无板载 SWR) | ❌ 不适用于 V3.0 |
-| 8 | `relay_driver_spice.cir` | ~~ULN2003A 继电器驱动~~ (V3.0 无继电器) | ❌ 不适用于 V3.0 |
+| # | 文件 | 仿真对象 | 状态 |
+|---|------|---------|:----:|
+| 1 | `lc_resonant_tank_analysis.md` | T200-6 LC 解析分析 (频率覆盖/Q值/效率/电容耐压) | ✅ |
+| 2 | `lc_resonant_tank_analysis.py` | Python 谐振计算脚本 (`python3 lc_resonant_tank_analysis.py`) | ✅ |
+| 3 | `thermal_analysis.md` | 热分析 (T200-6, MOSFET, DC-DC, 伺服) | ✅ |
+| 4 | `bias_tee_spice.cir` | Bias-T 同轴馈电 (RF+DC) | ✅ |
+| 5 | `pcb_transmission_lines.md` | PCB 传输线参数 | ✅ |
 
 ## 关键仿真发现 (V3.0 解析优化)
 
@@ -26,9 +22,8 @@
 | 场景 | C_stray | f_max (C=10pF) | 10m 可调? |
 |------|:------:|:--------------:|:---------:|
 | V3.0 点对点飞线 | 4 pF | 29.65 MHz | ✅ |
-| V2.0 PCB HV 走线 | 10 pF | 24.81 MHz | ❌ |
 
-**结论**: V3.0 的点对点 HV 飞线不仅是简化, 更是 10m 覆盖的**必要条件**。
+**结论**: 点对点 HV 飞线使 C_stray 低至 4pF，这是 10m 覆盖的关键保障。
 
 ### 🔑 匝数比对效率无影响
 
@@ -58,4 +53,4 @@ Q_loaded = Z_out / XL ∝ n² / N2² = constant (n ∝ N2)
 python3 auto-efhw-tuner/hardware/simulation/lc_resonant_tank_analysis.py
 ```
 
-输出: V3.0 扫频表 + V2.0 对比 + 匝数比优化 + 最优电容反推表
+输出: 扫频表 + 匝数比优化 + 最优电容反推表

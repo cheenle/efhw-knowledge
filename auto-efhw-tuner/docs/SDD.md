@@ -17,7 +17,7 @@
 | # | Chapter | Key Content |
 |---|---------|-------------|
 | 1 | Executive Summary | Fuchs ATU V3.0 概览、性能指标、架构分层 |
-| 2 | Business Direction | 目标用户、痛点、差异化(V2.0对比) |
+| 2 | Business Direction | 目标用户、痛点与解决方案 |
 | 3 | Project Definition | 属性、范围、里程碑 |
 | 4 | System Context | 新上下文图: ATR1000→MRRC→WiFi→ATU |
 | 5 | Non-Functional Requirements | 性能/可靠性/WiFi/安全 |
@@ -29,7 +29,7 @@
 | 11 | Component Model | 组件清单+端到端调谐序列 |
 | 12 | Operational Model | 部署拓扑 (室外IP66)、OTA双槽 |
 | 13 | Feasibility Assessment | Flash/RAM预算、风险 |
-| 14 | Version History | V1.0→V2.0→V3.0 |
+| 14 | Version History | 文档修订记录 |
 
 ---
 
@@ -39,7 +39,6 @@
 
 **EFHW Fuchs ATU V3.0** 是一台室外架设、Bias-T 同轴馈电、WiFi 远程自动调谐的末端馈电半波天线适配器。基于 F5NPV Fuchs 并联 LC 耦合器理论，以 ESP32-S3 驱动伺服电机控制空气可变电容连续调谐。SWR 感知完全委托给 MRRC 侧的 ATR1000，ATU 是纯执行机构。
 
-**V2.0→V3.0 根本变化**: 继电器切换固定电容阵列 → 伺服驱动连续可变电容。板载SWR检测 → 远程ATR1000。STM32F103 串口调试 → ESP32-S3 WiFi WebSocket。
 
 ## 1.2 Key Performance Metrics
 
@@ -53,7 +52,7 @@
 | RAM 用量 | 512KB SRAM → ~80KB |
 | 调谐缓存 | 16KB NVS 分区 → ~2000 条目 → 40m-10m 每 50kHz |
 | WiFi | 2.4GHz 802.11 b/g/n, WebSocket 长连接 |
-| 成本 | ~¥255/套 (较 V2.0 ¥390 降 35%) |
+| 成本 | ~¥255/套 |
 
 ## 1.3 Architecture Layers
 
@@ -85,18 +84,14 @@
 | 远程/无人站点 | 走到室外/爬到阁楼手动调 | WiFi远程完全免接触 |
 | 便携/野外操作者 | 设备越简单越好 | 无SWR桥/无继电器 (最少故障点) |
 
-## 2.2 Competitive Differentiation (vs V2.0)
+## 2.2 Key Differentiators
 
-| 维度 | V2.0 (STM32) | V3.0 Fuchs |
-|------|:-----------:|:----------:|
-| 调谐方式 | 128档继电器步进 | 伺服连续 (180°×0.5°) |
-| SWR 感知 | 板载 Tandem Match | MRRC ATR1000 远程 |
-| 通信 | 串口 | WiFi WebSocket |
-| MCU | STM32F103 72MHz | ESP32-S3 240MHz 双核 |
-| 磁芯 | T200-2B ×2 (μ=10) | T200-6 ×1 (μ=8) |
-| 故障点 | 7继电器+ULN2003A+SWR桥 | 1伺服+1MOSFET |
-| PCB | 140×90mm | 140×50mm |
-| 成本 | ¥390 | ¥255 |
+- **伺服连续调谐** (180°×0.5°精度) — 无档位跳变, 锁定后断电消抖
+- **远程 SWR 感知** — ATR1000 via MRRC, ATU 无板载 SWR 桥
+- **WiFi 无线控制** — WebSocket 长连接, 完全免接触
+- **ESP32-S3 单芯片** — 240MHz 双核, 固件全部 ESP-IDF 原生 C
+- **最少故障点** — 1 伺服 + 1 MOSFET (无继电器/无 SWR 桥)
+- **低成本** — ¥255/套
 
 ---
 
@@ -117,11 +112,10 @@
 
 | M# | Date | Deliverable |
 |----|------|-------------|
-| M1-M4 | 2026-06 | V1.0 PIC + V2.0 STM32 |
-| M5 | 2026-06-08 | **V3.0 Fuchs 设计规格 + 实施计划** |
-| M6 | 2026-06-08 | **ESP32-S3 固件 v1.0 (12源文件, ~2800行C)** |
-| M7 | TBD | PCB 打样 + 台架测试 |
-| M8 | TBD | 现场 7×24h FT8 验证 |
+| M1 | 2026-06-08 | 设计规格 + 实施计划 |
+| M2 | 2026-06-08 | ESP32-S3 固件 v1.0 (12源文件, ~2800行C) |
+| M3 | TBD | PCB 打样 + 台架测试 |
+| M4 | TBD | 现场 7×24h FT8 验证 |
 
 ---
 
@@ -350,7 +344,7 @@ Flow:
 |-------|-------|
 | **Decision** | **ESP32-S3-WROOM-1** 单芯片 (替代 F5NPV 的 ESP8266+Arduino Nano 双MCU) |
 | **Rationale** | 双核240MHz, 512KB SRAM, WiFi/BLE, LEDC PWM (伺服), 12-bit ADC (Bias-V), USB/JTAG, 16MB Flash (OTA双槽+NVS缓存) |
-| **Alternatives** | ESP8266 (老旧, 无LEDC), ESP32-C3 (单核, 无USB/JTAG), STM32F103+ESP-01S (双芯片增加故障点) |
+| **Alternatives** | ESP8266 (老旧, 无LEDC), ESP32-C3 (单核, 无USB/JTAG) |
 | **Impact** | 固件从Arduino框架迁移到ESP-IDF原生C; 全部功能单芯片实现 |
 
 ### AD-002: Fuchs 拓扑 (并联LC)
@@ -359,7 +353,7 @@ Flow:
 |-------|-------|
 | **Decision** | **T200-6 单磁芯 2:14T + 空气可变电容 10-500pF** (F5NPV/M0UKD系) |
 | **Rationale** | Type 6低μ(8)高频Q>150; 连续调谐实现SWR<1.1:1; 单电容覆盖40m-10m; 无继电器(零热切换风险) |
-| **Impact** | 放弃V2.0的T200-2B双叠+7位电容阵列; B_peak校核通过(12.7mT vs 600mT饱和) |
+| **Impact** | T200-6 单磁芯方案; B_peak 校核通过 (12.7mT vs 600mT 饱和, 47× 裕度) |
 
 ### AD-003: 无板载SWR (远程ATR1000)
 
@@ -369,13 +363,13 @@ Flow:
 | **Rationale** | 删掉Tandem Match桥(BAT41/FT37-43/校准电位器), 减少BOM和故障点; 调谐精度由ATR1000保证(优于自制SWR桥) |
 | **Impact** | 调谐每步延迟取决于网络往返(~50-100ms); 断网时不可调谐(设计取舍: 室外IP66用WiFi) |
 
-### AD-004: 伺服连续调谐 vs 继电器步进
+### AD-004: 伺服连续调谐
 
 | Field | Value |
 |-------|-------|
 | **Decision** | **MG996R伺服驱动空气可变电容连续调谐** |
-| **Rationale** | F5NPV验证过的方案; 连续可调避免档位跳变; 调谐后断电消抖; 故障点从7继电器→1伺服 |
-| **Impact** | 调谐时间稍长(8s vs 1.5s全扫描)但精度高; 需要齿轮减速匹配; 堵转检测 |
+| **Rationale** | F5NPV验证过的方案; 连续可调; 调谐后断电消抖; 仅2个故障点(伺服+MOSFET) |
+| **Impact** | 全扫描 ~8s; 需要齿轮减速匹配; 需堵转检测 |
 
 ### AD-005: 固件框架 — ESP-IDF vs Arduino
 
@@ -383,7 +377,7 @@ Flow:
 |-------|-------|
 | **Decision** | **ESP-IDF v5.x 原生C** (非Arduino) |
 | **Rationale** | LEDC PWM / ADC oneshot / NVS分区 / OTA双槽 / Task WDT 用IDF API更可控; Arduino封装层增加开销 |
-| **Impact** | 需要完整的ESP-IDF工具链; 不能复用V2.0的任何Arduino代码 |
+| **Impact** | 需要完整的ESP-IDF工具链; 所有代码为原生C实现 |
 
 ### AD-006: NVS调谐缓存
 
@@ -638,20 +632,16 @@ app_main (main loop):
 
 | Version | Date | Changes |
 |---------|------|---------|
-| V1.0 | 2026-06-07 | PIC16F1938 工程设计 |
-| V2.0 | 2026-06-08 | STM32F103 + ModularTuner 复用 |
-| **V3.0** | **2026-06-08** | **Fuchs ATU 全面重构** |
-| | | MCU: ESP32-S3-WROOM-1 (240MHz 双核) |
-| | | Core: T200-6 ×1 (μ=8) + 空气可变电容 + MG996R |
-| | | SWR: 远程ATR1000 (无板载SWR桥) |
-| | | 通信: WiFi WebSocket → MRRC 集成 |
-| | | 电容: 伺服连续替代继电器步进 (128档→连续) |
-| | | PCB: 140×50mm (90mm→50mm, -44%) |
-| | | 固件: ESP-IDF v5 C (非Arduino) |
-| | | 成本: ¥255 (较V2.0 ¥390 降35%) |
+| **V3.0** | **2026-06-08** | **Fuchs ATU — ESP32-S3 + T200-6 + MG996R 伺服调谐** |
+| | | MCU: ESP32-S3-WROOM-1 (240MHz 双核 Xtensa LX7) |
+| | | Core: T200-6 ×1 (μ=8) + 空气可变电容 10-500pF |
+| | | SWR: 远程 ATR1000 via MRRC (无板载SWR桥) |
+| | | 通信: WiFi WebSocket → MRRC 深度集成 |
+| | | 固件: ESP-IDF v5.x 原生 C, 3 FreeRTOS 任务 |
+| | | PCB: 140×50mm 单区地平面 |
+| | | 成本: ~¥255/套 |
 
 ---
 
 > **关联文档**: [`FDE.md`](FDE.md) · [`../hardware/SCH_Description.md`](../hardware/SCH_Description.md) · [`../hardware/PCB_Description.md`](../hardware/PCB_Description.md)
-> **固件源码**: [`../firmware-esp32/`](../firmware-esp32/)
-> **legacy 固件**: [`../firmware-legacy/stm32/`](../firmware-legacy/stm32/) (V2.0) [`../firmware-legacy/pic/`](../firmware-legacy/pic/) (V1.0)
+> **固件源码**: [`../firmware-esp32/`](../firmware-esp32/) · **版本历史**: [`../CHANGELOG.md`](../CHANGELOG.md)

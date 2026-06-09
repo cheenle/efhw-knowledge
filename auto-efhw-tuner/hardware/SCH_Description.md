@@ -25,9 +25,6 @@ Root Sheet: EFHW_Fuchs_ATU_V3
 └── Sheet 4/4: PROTECTION (保护电路)
     90V GDT + 2.2MΩ 静电泄放 + 天线/地网端子
 ```
-
-**V2.0 → V3.0 变化**: 删除 Sheet 3 (SWR桥) 和 Sheet 4 (继电器驱动)。无SWR本地采样，无继电器。PCB仅为控制+电源板，RF高压路径为点对点飞线。
-
 ---
 
 ## 2. Sheet 1/4: POWER — 电源管理
@@ -170,7 +167,6 @@ T200-6 次级14匝冷端 → GND + 可变电机动片
 
 ## 5. Sheet 4/4: PROTECTION — 保护电路
 
-与 V2.0 完全相同:
 - **GDT1**: 90V 气体放电管，天线端对地，≥5kA 8/20µs
 - **R_bleed**: 2.2MΩ 2W 3KV 金属釉膜无感电阻，天线端对地 (静电泄放)
 - **隔直**: C_block1/2 (10nF 1KV C0G ×2)，TRX 端
@@ -195,4 +191,3 @@ GND_PCB      GND_ANT    GND_VAR_CAP
 ---
 
 > **关联文档**: [`PCB_Description.md`](PCB_Description.md) · [`EFHW_TUNER_BOM_FUCHS.csv`](EFHW_TUNER_BOM_FUCHS.csv)
-> **上一版本**: SCH-EFHW-STM32-V2.0 (已归档为 legacy 参考)
