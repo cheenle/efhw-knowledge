@@ -1,8 +1,18 @@
-# KiCad 原理图与 PCB 设计指南
-# =================================
-# EFHW Auto Tuner 100W — STM32F103 Bluepill
-# 版本: V2.0
-# =================================
+# KiCad 原理图与 PCB 设计指南 (📦 V2.0 Legacy — 已归档)
+
+> ⚠️ **2026-06-09**: 本文档为 **V2.0 STM32F103 Bluepill** 时代的 KiCad 指南，已归档作为历史参考。V3.0 Fuchs ATU 的硬件设计见:
+> - [`SCH_Description.md`](SCH_Description.md) — V3.0 原理图 (ESP32-S3 + T200-6 + MG996R)
+> - [`PCB_Description.md`](PCB_Description.md) — V3.0 PCB 布局 (140×50mm, 单区地平面)
+>
+> V3.0 与 V2.0 的硬件根本差异: 无继电器、无 SWR 桥、无高压隔离槽; PCB 仅为控制+电源板; RF 高压路径全部点对点飞线。
+>
+> ---
+>
+> # KiCad 原理图与 PCB 设计指南
+> # =================================
+> # EFHW Auto Tuner 100W — STM32F103 Bluepill
+> # 版本: V2.0 (ARCHIVED)
+> # =================================
 
 ## 一、KiCad 项目设置
 

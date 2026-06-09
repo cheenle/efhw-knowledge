@@ -2,8 +2,9 @@
 
 > **Document ID**: SDD-EFHW-FUCHS-V3.0
 > **Version**: V3.0
-> **Date**: 2026-06-08
+> **Date**: 2026-06-09
 > **Status**: Released
+> **Online**: https://ybr387rz.mule.page/
 > **Methodology**: IBM Team Solution Design (TeamSD) v2.3.2
 > **MCU**: ESP32-S3-WROOM-1 (Xtensa LX7 双核 240MHz, 16MB Flash)
 > **Framework**: ESP-IDF v5.x (Native C, FreeRTOS)

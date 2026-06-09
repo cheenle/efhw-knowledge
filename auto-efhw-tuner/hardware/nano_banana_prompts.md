@@ -1,4 +1,8 @@
-# Nano Banana PCB 可视化 — 精简 Prompt
+# Nano Banana PCB 可视化 — 精简 Prompt (📦 V1.0/V2.0 Legacy)
+
+> ⚠️ **2026-06-09**: 本文档为 **V1.0 PIC16F1938 / V2.0 STM32F103** 时代的 AI 图像生成 Prompt (7继电器, 140×90mm, A/B 区隔离)。V3.0 Fuchs ATU PCB 尺寸为 140×**50mm** 单区, 无继电器, 无高压隔离槽。PCB 可视化 Prompt 待更新以反映 V3.0 硬件。
+
+---
 
 ---
 
