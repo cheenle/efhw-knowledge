@@ -9,11 +9,11 @@ All notable changes to the EFHW Auto Tuner project.
 ### Architecture
 - **MCU**: ESP32-S3-WROOM-1 (240MHz dual-core Xtensa LX7, 16MB Flash)
 - **Core**: T200-6 ×1 (Type 6 Carbonyl Iron, μ=8), 2:14 turns → 49:1
-- **Capacitor**: Air variable 10-500pF, MG996R servo continuous drive
+- **Capacitor**: Transmitter-grade air variable 10-500pF, MG996R servo continuous drive
 - **SWR Sensing**: Remote ATR1000 via MRRC (no onboard SWR bridge)
 - **Communication**: WiFi 2.4GHz WebSocket → MRRC integration
 - **Framework**: ESP-IDF v5.x Native C, FreeRTOS (3 tasks)
-- **PCB**: 140×50mm single-zone, control+power only, RF HV point-to-point fly wires
+- **PCB**: 140×50mm low-voltage control board, RF HV point-to-point chassis wiring
 
 ### Key Decisions
 - AD-001: ESP32-S3 single-chip (replaces ESP8266+Arduino Nano dual MCU)
@@ -27,13 +27,13 @@ All notable changes to the EFHW Auto Tuner project.
 - Frequency: 40m–10m (7.0–29.7 MHz, WARC全覆盖)
 - Power: 100W PEP SSB/CW
 - Tune time: <10s full sweep / <1s cache hit
-- Cost: ~¥255/unit (↓35% vs V2.0)
+- Cost: ~¥430/unit (high-voltage capacitor and low-EMI power parts included)
 - Firmware: 12 source files, ~2800 lines C
 - Enclosure: IP66 AL 160×110×70mm
 
 ### Docs
 - SDD: 14-chapter IBM TeamSD v2.3.2 → [ybr387rz.mule.page](https://ybr387rz.mule.page/)
-- FDE: 19 faults FMEA + 3-stage POST
+- FDE: current detection boundary + bench verification matrix
 - BOM: EFHW_TUNER_BOM_FUCHS.csv
 - Simulation: LC resonant tank (Python analytical), thermal analysis, Bias-T SPICE
 
@@ -105,5 +105,5 @@ All notable changes to the EFHW Auto Tuner project.
 | Framework | MPLAB XC8 | Arduino | ESP-IDF v5 C |
 | PCB | 140×90mm | 140×90mm | 140×50mm |
 | Failure Points | 9 | 9 | 2 |
-| Cost | ¥375 | ¥390 | ¥255 |
+| Cost | ¥375 | ¥390 | ¥430 |
 | Firmware | 16 files | 3 files | 12 files ~2800 lines |

@@ -42,6 +42,8 @@ static bool     swr_pending = false;
 
 static uint8_t  fine_center = 0;
 
+#define COARSE_MAX_STEP (SERVO_SWEEP_DEGREES / SERVO_COARSE_STEP_DEG)
+
 void tune_engine_init(void) {
     phase = TUNE_PHASE_IDLE;
     atu_state = ATU_IDLE;
@@ -58,7 +60,7 @@ atu_state_t tune_engine_get_state(void) {
 
 uint8_t tune_engine_get_progress_pct(void) {
     if (phase == TUNE_PHASE_COARSE_SWEEP) {
-        return (coarse_step * 100) / 36;
+        return (coarse_step * 100) / COARSE_MAX_STEP;
     } else if (phase == TUNE_PHASE_FINE_SWEEP) {
         return (fine_step * 100) / 30;
     }
@@ -171,7 +173,7 @@ void tune_engine_feed_swr(float swr, float fwd_pwr_w) {
         best_swr = swr;
         best_pos = servo_get_angle();
         if (swr < TUNE_EARLY_EXIT_SWR && phase == TUNE_PHASE_COARSE_SWEEP) {
-            coarse_step = 36;  /* force end of coarse loop */
+            coarse_step = COARSE_MAX_STEP;  /* force end of coarse loop */
         }
     }
 
@@ -179,7 +181,7 @@ void tune_engine_feed_swr(float swr, float fwd_pwr_w) {
     if (phase == TUNE_PHASE_COARSE_SWEEP) {
         coarse_step++;
 
-        if (coarse_step >= 36) {
+        if (coarse_step > COARSE_MAX_STEP) {
             if (best_swr > TUNE_FINE_THRESHOLD_SWR) {
                 ESP_LOGI(TAG, "Coarse done, best pos=%d SWR=%.2f → fine sweep",
                          best_pos, best_swr);

@@ -18,15 +18,15 @@
 | 功率 | 100W PEP SSB/CW |
 | 磁芯 | T200-6 ×1 (Type 6 羰基铁粉, μ=8) |
 | 匝数比 | 2:14 → 49:1 阻抗比 → 匹配 ~2,450Ω |
-| 电容 | 空气可变 10-500pF, 伺服连续驱动 |
-| 调谐方式 | 粗扫 36 步 @5°/步 + 细扫 30 步 @1°/步 |
+| 电容 | 发射机级空气可变 10-500pF, ≥5kV或片距≥1.5mm, 伺服连续驱动 |
+| 调谐方式 | 粗扫 37 点 @5°/步(0-180°) + 细扫 30 步 @1°/步 |
 | 调谐时间 | < 10s (全扫描) / < 1s (NVS 缓存命中) |
 | SWR 感知 | 无板载 SWR — 完全由 MRRC ATR1000 远程提供 |
 | 通信 | WiFi 2.4GHz WebSocket → MRRC 深度集成 |
 | 供电 | Bias-T 同轴馈电 13.8V DC |
-| 防护 | IP66 铝壳 + 90V GDT + 2.2MΩ 静电泄放 |
-| PCB | 140×50mm, 控制+电源板, RF 高压飞线 |
-| 成本 | ~¥255/套 |
+| 防护 | IP66 铝壳 + 2.2MΩ 静电泄放 + 预留HV火花隙/DNP |
+| PCB | 140×50mm 低压控制+电源板, RF高压谐振区板外硬线 |
+| 成本 | ~¥430/套 |
 | 固件 | ESP-IDF v5.x C, 12 源文件, ~2800 行 |
 
 ## 目录结构
@@ -53,8 +53,8 @@ auto-efhw-tuner/
 │   └── README.md
 ├── hardware/                       ← 硬件设计文件
 │   ├── SCH_Description.md          ← V3.0 原理图 (4 Sheet: Power/MCU/HV_Tank/Protection)
-│   ├── PCB_Description.md          ← V3.0 PCB 布局 (140×50mm, 单区地平面)
-│   ├── EFHW_TUNER_BOM_FUCHS.csv    ← V3.0 BOM (ESP32-S3 + T200-6 + MG996R)
+│   ├── PCB_Description.md          ← V3.0 PCB/物理布局 (低压PCB + 板外RF/HV区)
+│   ├── EFHW_TUNER_BOM_FUCHS.csv    ← V3.0 BOM (ESP32-S3 + T200-6 + 发射机级电容)
 │   └── simulation/                 ← SPICE + 解析仿真
 │       ├── README.md               ← 仿真索引 (LC/热/Bias-T/PCB)
 │       ├── lc_resonant_tank_analysis.md  ← T200-6 LC 解析分析
@@ -64,7 +64,7 @@ auto-efhw-tuner/
 │       └── pcb_transmission_lines.md ← PCB 传输线参数
 ├── docs/                           ← 工程文档
 │   ├── SDD.md                      ← 软件设计文档 (14章, IBM TeamSD v2.3.2)
-│   ├── FDE.md                      ← 故障检测与消除 (19故障 FMEA, 3阶段POST)
+│   ├── FDE.md                      ← 当前可检测故障边界 + 工程风险控制
 │   ├── V3_MIGRATION_CHECKLIST.md   ← V3.0 验证清单 (11大类)
 │   ├── assembly_test_manual.md     ← V3.0 装配、测试、故障排查手册
 │   └── tune_sequence.png           ← 端到端调谐时序图
@@ -100,11 +100,11 @@ auto-efhw-tuner/
 |------|------|------|
 | **在线 SDD** | 14章完整软件设计规格书 (暗色主题, 侧栏导航, 架构图全渲染) | [ybr387rz.mule.page](https://ybr387rz.mule.page/) |
 | SDD (源码) | 14章 IBM TeamSD: 架构/接口/状态机/时序/部署 | [`docs/SDD.md`](docs/SDD.md) |
-| FDE | 19故障 FMEA + 3阶段POST + 降级策略 + 故障注入 | [`docs/FDE.md`](docs/FDE.md) |
+| FDE | 当前固件可检测项、不可检测风险、台架验证矩阵 | [`docs/FDE.md`](docs/FDE.md) |
 | 验证清单 | 11大类固件/硬件/MRRC联调/现场验证 | [`docs/V3_MIGRATION_CHECKLIST.md`](docs/V3_MIGRATION_CHECKLIST.md) |
 | 装配手册 | 工具清单 → 焊接 → 磁环绕制 → 伺服安装 → 测试 | [`docs/assembly_test_manual.md`](docs/assembly_test_manual.md) |
 | 原理图 | 4 Sheet: Power/MCU/HV_Tank/Protection (Netlist 级) | [`hardware/SCH_Description.md`](hardware/SCH_Description.md) |
-| PCB 布局 | 140×50mm 坐标级规格 + DRC 规则 | [`hardware/PCB_Description.md`](hardware/PCB_Description.md) |
+| PCB 布局 | 140×50mm低压板 + 壳体内RF/HV物理布局 + DRC 规则 | [`hardware/PCB_Description.md`](hardware/PCB_Description.md) |
 | BOM | 完整物料清单 | [`hardware/EFHW_TUNER_BOM_FUCHS.csv`](hardware/EFHW_TUNER_BOM_FUCHS.csv) |
 | 仿真 | LC 谐振/热分析/Bias-T/PCB 传输线 | [`hardware/simulation/`](hardware/simulation/) |
 | Bias-T 设计 | 室内注入盒独立子设计 | [`bias-tee/bias_tee_design.md`](bias-tee/bias_tee_design.md) |

@@ -52,7 +52,7 @@
 | RAM 用量 | 512KB SRAM → ~80KB |
 | 调谐缓存 | 16KB NVS 分区 → ~2000 条目 → 40m-10m 每 50kHz |
 | WiFi | 2.4GHz 802.11 b/g/n, WebSocket 长连接 |
-| 成本 | ~¥255/套 |
+| 成本 | ~¥430/套 (含发射机级高压电容) |
 
 ## 1.3 Architecture Layers
 
@@ -91,7 +91,7 @@
 - **WiFi 无线控制** — WebSocket 长连接, 完全免接触
 - **ESP32-S3 单芯片** — 240MHz 双核, 固件全部 ESP-IDF 原生 C
 - **最少故障点** — 1 伺服 + 1 MOSFET (无继电器/无 SWR 桥)
-- **低成本** — ¥255/套
+- **工程裕度优先** — 成本提高到约¥430/套, 换取高压电容和低EMI电源裕度
 
 ---
 
@@ -132,13 +132,13 @@
 │  ┌────────────────┐  ┌────────────┐  ┌──────────────┐  │    │
 │  │ Bias-T Extract │  │ ESP32-S3   │  │ Fuchs LC     │  │    │
 │  │ L_bias FT37-43 │  │ WiFi STA   │  │ Coupler      │──┼────┤→ Ant ~20m
-│  │ LM2940→LM2596  │  │ WebSocket  │  │ T200-6 2:14T │  │    │
+│  │ LM2940→DC-DC   │  │ WebSocket  │  │ T200-6 2:14T │  │    │
 │  │ →AMS1117       │  │ LEDC PWM   │  │ Air Var Cap  │  │    │
 │  └────────────────┘  │ ADC Bias-V │  │ 10-500pF     │  │    │
 │                      │ GPIO Ctrl  │  │ MG996R Servo │  │    │
 │                      └──────┬─────┘  └──────────────┘  │    │
 │                             │ WiFi                      │    │
-│  Protection: 90V GDT + 2.2MΩ bleeder                  │    │
+│  Protection: 2.2MΩ bleeder + HV spark-gap footprint   │    │
 └─────────────────────────────┼───────────────────────────┘    │
                               │                                │
                     ┌─────────┴─────────┐                      │
@@ -157,7 +157,7 @@
 | Interface | Physical | Signal/Protocol |
 |-----------|----------|-----------------|
 | RF IN | SO-239 M座 | 50Ω, 1.8-30MHz, ≤100W + 13.8V DC |
-| Antenna OUT | M5 304SS bolt + PTFE | ~2,450Ω, ≤3KV peak |
+| Antenna OUT | M5 304SS bolt + PTFE | ~2,450Ω, RF热端按≥5kV物理间距设计 |
 | WiFi | ESP32-S3 PCB天线 | 2.4GHz 802.11 b/g/n, WPA2 |
 | WebSocket | TCP/ws over WiFi | JSON 协议 (见 protocol.h) |
 | USB | ESP32-S3 USB Serial/JTAG | 烧录 + 调试, 115200bps |
@@ -181,7 +181,7 @@
 
 | ID | Requirement | Target | Implementation |
 |----|------------|--------|----------------|
-| P01 | 全扫描调谐 | < 10s | 36粗步+30细步 × 80ms/步 + SWR往返 ~100ms |
+| P01 | 全扫描调谐 | < 10s | 37个粗扫采样点(0-180°@5°)+30步细扫 × 80ms/步 + SWR往返 ~100ms |
 | P02 | 缓存命中调谐 | < 1s | NVS查→直接定位伺服 |
 | P03 | 伺服定位精度 | ±0.5° | 16-bit PWM, 180°满量程 |
 | P04 | WiFi重连 | < 10s | 自动重连, 间隔 3s |
@@ -193,9 +193,9 @@
 |----|------------|----------------|
 | R01 | 禁止大功率调谐 | fwd_pwr > 15W → 中止+伺服归零 (由MRRC检测) |
 | R02 | RF丢失保护 | fwd_pwr < 0.5W → 中止 (由MRRC检测) |
-| R03 | 伺服堵转检测 | 3次位置无变化 → 断电+告警 |
+| R03 | 伺服堵转风险 | 当前硬件无真实位置/电流反馈; 通过调谐超时、SWR不收敛和人工巡检发现 |
 | R04 | 看门狗 | ESP32-S3 Task WDT 5s + RTC WDT |
-| R05 | 调谐后伺服断电 | MOSFET切断6V供电 (GPIO2 HIGH) |
+| R05 | 调谐后伺服断电 | MOSFET切断6V供电; NPN下拉方案为 GPIO2 LOW=断电, HIGH=供电 |
 | R06 | NVS 写失败 | 日志记录, RAM缓存继续工作 |
 
 ## 5.3 Environmental
@@ -223,7 +223,7 @@ Basic Flow:
 3. ESP32-S3查NVS缓存:
    - 命中 → 伺服直接定位, 上报 tune_done (< 1s)
    - 未命中 → 启动粗扫
-4. 粗扫: 伺服 0°→180° @ 5°/步 × 36步
+4. 粗扫: 伺服 0°→180° @ 5°/步, 共37个采样点
    每步: 伺服移动 → 等待SWR (MRRC→ATR1000→回传, ~100ms)
    记录 min_SWR 位置
    SWR < 1.05 → 提前退出
@@ -273,8 +273,8 @@ Actor: System (每10秒自动)
 Flow:
 1. 读 Bias-T 电压 (<10V 或 >15V → DEGRADED)
 2. 读核心温度 (>80°C → DEGRADED)
-3. 上报 health_alert 到 MRRC
-4. HEALTHY → DEGRADED 时限制自动调谐
+3. Bias-T异常会上报 health_alert 到 MRRC; 温度异常当前仅更新本地健康状态
+4. 当前实现仅在 HEALTHY/DEGRADED 间切换, 尚未强制禁止调谐
 ```
 
 ---
@@ -285,7 +285,7 @@ Flow:
 
 | Entity | Attributes | Persistence |
 |--------|-----------|-------------|
-| **ServoState** | current_angle(0-180), prev_angle | RAM |
+| **ServoState** | current_angle(0-180, commanded only) | RAM |
 | **TuneCache** | 2000+ entries{freq_khz→servo_pos} | NVS Flash (nvs_tune分区 24KB) |
 | **WSConnection** | connected(bool), ws_handle | RAM |
 | **HealthState** | HEALTHY/DEGRADED/SAFE, bias_voltage, core_temp | RAM |
@@ -320,6 +320,8 @@ Flow:
 
 ## 7.3 Health FSM
 
+Current firmware implements `SYS_HEALTHY` and `SYS_DEGRADED` transitions for Bias-V/temp checks. `SYS_SAFE` exists in the enum but is not yet latched or enforced.
+
 ```
   POST ──▶ SYS_HEALTHY
                │
@@ -327,9 +329,9 @@ Flow:
                ▼
           SYS_DEGRADED (仍可调谐, 仅告警)
                │
-  critical (连续3次调谐失败 / WDT触发)
+  planned: critical (连续3次调谐失败 / WDT触发)
                ▼
-           SYS_SAFE (伺服归零, 禁调谐)
+           SYS_SAFE (planned: 伺服归零, 禁调谐)
                │
     ONLY exit: power cycle + 健康恢复
 ```
@@ -351,9 +353,9 @@ Flow:
 
 | Field | Value |
 |-------|-------|
-| **Decision** | **T200-6 单磁芯 2:14T + 空气可变电容 10-500pF** (F5NPV/M0UKD系) |
-| **Rationale** | Type 6低μ(8)高频Q>150; 连续调谐实现SWR<1.1:1; 单电容覆盖40m-10m; 无继电器(零热切换风险) |
-| **Impact** | T200-6 单磁芯方案; B_peak 校核通过 (12.7mT vs 600mT 饱和, 47× 裕度) |
+| **Decision** | **T200-6 单磁芯 2:14T + 发射机级空气可变电容 10-500pF** (F5NPV/M0UKD系) |
+| **Rationale** | Type 6低μ(8)高频Q>150; 连续调谐实现SWR<1.1:1; 单电容覆盖40m-10m; RF电容峰值可能达到数kV, 必须使用发射机级电容 |
+| **Impact** | T200-6 单磁芯方案; B_peak 校核通过 (12.7mT vs 600mT 饱和, 47× 裕度); 机械体积和成本由高压电容主导 |
 
 ### AD-003: 无板载SWR (远程ATR1000)
 
@@ -369,7 +371,7 @@ Flow:
 |-------|-------|
 | **Decision** | **MG996R伺服驱动空气可变电容连续调谐** |
 | **Rationale** | F5NPV验证过的方案; 连续可调; 调谐后断电消抖; 仅2个故障点(伺服+MOSFET) |
-| **Impact** | 全扫描 ~8s; 需要齿轮减速匹配; 需堵转检测 |
+| **Impact** | 全扫描 ~8s; 需要齿轮减速匹配; 当前硬件无真实堵转反馈, 需靠调谐超时/SWR不收敛和人工巡检兜底 |
 
 ### AD-005: 固件框架 — ESP-IDF vs Arduino
 
@@ -556,10 +558,10 @@ OUTDOOR:                                                   │
   │                                         │               │
   │                                    MG996R Servo         │
   │                                         │               │
-  │  ┌─ PCB 140×50mm ─────────────────────┐│               │
-  │  │ ESP32-S3 + LM2940 + LM2596 + AMS1117│               │
+  │  ┌─ PCB 140×50mm 低压控制板 ──────────┐│               │
+  │  │ ESP32-S3 + LM2940 + shielded DC-DC ││               │
   │  │ IRF9540 MOSFET (伺服VCC开关)        │               │
-  │  │ GDT (90V) + 2.2MΩ bleed             │               │
+  │  │ RF高压二次侧不走PCB                 │               │
   │  └─────────────────────────────────────┘│               │
   │  1.5mm breather hole + desiccant       │               │
   └─────────────────────────────────────────┘               │
@@ -597,7 +599,7 @@ app_main (main loop):
 | Brown-out | BOR reset → same as WDT |
 | WiFi disconnect | Auto-reconnect every 10s; LED fast blink |
 | WebSocket disconnect | Auto-reconnect after 3s; send queue drains |
-| Servo stall | 3 retries → tune_error → servo power off |
+| Servo stall | 当前硬件无法直接检测; 调谐超时/SWR不收敛 → servo power off, 人工检查 |
 | NVS corruption | Auto-erase partition + reinit |
 | OTA failure | Bootloader auto-rollback to previous slot |
 
@@ -610,10 +612,10 @@ app_main (main loop):
 | Risk | Mitigation |
 |------|------------|
 | WiFi 室外稳定性 | 2.4GHz PCB天线; 距路由器30m内; 自动重连 |
-| 伺服齿轮卡死 | 堵转检测(3次位置不变→告警→断电) |
-| 可变电容打火 | 空气介质, 1kV耐压, 100W时峰值仅700V |
+| 伺服齿轮卡死 | 当前无位置/电流反馈; 调谐超时/SWR不收敛告警, 下一版增加电流检测或位置反馈 |
+| 可变电容打火 | 使用发射机级空气电容(≥5kV或片距≥1.5mm), RF热端板外硬线, ≥15mm低压隔离 |
 | T200-6 饱和 | B_peak 12.7mT vs 600mT饱和 (47×裕度) |
-| 空气可变电容货源 | 拆机件(廉价但品控不一); 建议最终切换到国产新品 |
+| 空气可变电容货源 | 优先发射机/军机拆机件或定制件; 普通收音机电容仅限低功率实验 |
 
 ## 13.2 Resource Budget
 
@@ -624,7 +626,7 @@ app_main (main loop):
 | GPIO | 45 | ~8 | 37 |
 | ADC channels | 20 | 1 | 19 |
 | NVS tune cache | 24KB | ~16KB (2000条目 × 8B) | 33% |
-| Cost | ¥300 | ~¥255 | On budget |
+| Cost | ¥500 | ~¥430 | 高压电容升级后仍可控 |
 
 ---
 
@@ -634,12 +636,12 @@ app_main (main loop):
 |---------|------|---------|
 | **V3.0** | **2026-06-08** | **Fuchs ATU — ESP32-S3 + T200-6 + MG996R 伺服调谐** |
 | | | MCU: ESP32-S3-WROOM-1 (240MHz 双核 Xtensa LX7) |
-| | | Core: T200-6 ×1 (μ=8) + 空气可变电容 10-500pF |
+| | | Core: T200-6 ×1 (μ=8) + 发射机级空气可变电容 10-500pF |
 | | | SWR: 远程 ATR1000 via MRRC (无板载SWR桥) |
 | | | 通信: WiFi WebSocket → MRRC 深度集成 |
 | | | 固件: ESP-IDF v5.x 原生 C, 3 FreeRTOS 任务 |
-| | | PCB: 140×50mm 单区地平面 |
-| | | 成本: ~¥255/套 |
+| | | PCB: 140×50mm 低压控制板; RF高压谐振区板外点对点硬线 |
+| | | 成本: ~¥430/套 |
 
 ---
 

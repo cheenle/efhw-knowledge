@@ -26,7 +26,7 @@
 // 3. GPIO Pin Map (ESP32-S3)
 // ============================================================
 #define PIN_SERVO_PWM           GPIO_NUM_1
-#define PIN_SERVO_POWER_CUT     GPIO_NUM_2
+#define PIN_SERVO_POWER_EN      GPIO_NUM_2
 #define PIN_STATUS_LED          GPIO_NUM_6
 #define PIN_BUZZER              GPIO_NUM_7
 

@@ -3,9 +3,9 @@
  *
  * PWM: 50Hz, 16-bit resolution
  * Pulse: 500-2500µs maps to 0-180°
- * Power: GPIO-driven IRF9540 P-MOSFET via 2N2222A
- *        HIGH on GPIO → P-MOSFET OFF → servo VCC disconnected
- *        LOW  on GPIO → P-MOSFET ON  → servo VCC connected
+ * Power: GPIO-driven IRF9540 P-MOSFET via 2N2222A gate pulldown
+ *        HIGH on GPIO → P-MOSFET ON  → servo VCC connected
+ *        LOW  on GPIO → P-MOSFET OFF → servo VCC disconnected
  */
 
 #include "servo_ctrl.h"
@@ -17,7 +17,6 @@
 
 static const char *TAG = "servo";
 static uint8_t current_angle = 0;
-static uint8_t prev_angle = 255;
 
 void servo_init(void) {
     ledc_timer_config_t timer_cfg = {
@@ -40,7 +39,7 @@ void servo_init(void) {
     ESP_ERROR_CHECK(ledc_channel_config(&channel_cfg));
 
     gpio_config_t pwr_cfg = {
-        .pin_bit_mask = (1ULL << PIN_SERVO_POWER_CUT),
+        .pin_bit_mask = (1ULL << PIN_SERVO_POWER_EN),
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -50,14 +49,12 @@ void servo_init(void) {
 
     servo_power_off();
 
-    ESP_LOGI(TAG, "Initialized: PWM 50Hz, pin=%d, power_cut=%d",
-             PIN_SERVO_PWM, PIN_SERVO_POWER_CUT);
+    ESP_LOGI(TAG, "Initialized: PWM 50Hz, pin=%d, power_en=%d",
+             PIN_SERVO_PWM, PIN_SERVO_POWER_EN);
 }
 
 bool servo_set_angle(uint8_t degrees) {
     if (degrees > SERVO_SWEEP_DEGREES) return false;
-
-    prev_angle = current_angle;
 
     uint32_t pulse_us = SERVO_PULSE_MIN_US +
         ((uint32_t)degrees * (SERVO_PULSE_MAX_US - SERVO_PULSE_MIN_US)) /
@@ -78,16 +75,17 @@ uint8_t servo_get_angle(void) {
 }
 
 void servo_power_off(void) {
-    gpio_set_level(PIN_SERVO_POWER_CUT, 1);
+    gpio_set_level(PIN_SERVO_POWER_EN, 0);
     ESP_LOGD(TAG, "Servo power OFF");
 }
 
 void servo_power_on(void) {
-    gpio_set_level(PIN_SERVO_POWER_CUT, 0);
+    gpio_set_level(PIN_SERVO_POWER_EN, 1);
     ESP_LOGD(TAG, "Servo power ON");
     vTaskDelay(pdMS_TO_TICKS(50));
 }
 
 bool servo_detect_stall(void) {
-    return (current_angle == prev_angle);
+    /* No position or current feedback is available on this board revision. */
+    return false;
 }

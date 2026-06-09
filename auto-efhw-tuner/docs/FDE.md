@@ -1,175 +1,174 @@
-# EFHW Fuchs ATU V3.0 — Fault Detection & Engineering (FDE)
+# EFHW Fuchs ATU V3.0 — Fault Detection & Engineering Notes
 
 > **Document ID**: FDE-EFHW-FUCHS-V3.0
 > **Version**: V3.0
-> **Date**: 2026-06-08
-> **Status**: Released
-> **MCU**: ESP32-S3-WROOM-1
+> **Date**: 2026-06-09
+> **Status**: Engineering draft, must be verified on bench
+> **Scope**: What this hardware/firmware can actually detect, what it cannot detect, and how to verify the residual risks.
 
 ---
 
-## 1. Fault Catalog
+## 1. Detection Boundary
 
-| F# | Component | Fault Mode | Detection | Response |
-|----|-----------|-----------|-----------|----------|
-| F01 | MG996R Servo | Stall (齿轮卡死/堵转) | Position unchanged 3× after set_angle() | Cut power, tune_error (stall), SYS_DEGRADED |
-| F02 | MG996R Servo | Stripped gear (空转) | SWR不随位置变化(需MRRC检测) | tune_error (no_match) |
-| F03 | IRF9540 P-MOSFET | Short (伺服VCC常通) | 伺服空闲时有动作噪音 | Log alert, 不影响功能 |
-| F04 | IRF9540 P-MOSFET | Open (伺服永远断电) | tune_engine detects consecutive stall | tune_error (stall), SYS_DEGRADED |
-| F05 | 2N2222A NPN | Open (栅极无法拉低) | MOSFET不导通 → 伺服无电 | tune_error (stall) |
-| F06 | T200-6 Core | Saturation (大功率/低频) | 匹配失效, SWR突变 | B_peak校核已排除此风险(47×裕度) |
-| F07 | Variable Capacitor | Arc-over (打火/极板短路) | SWR = ∞ (全反射) | GDT保护, 物理恢复后需重启 |
-| F08 | LM2596 DC-DC | Overheat/失效 | 6V轨跌落, 伺服无力 | tune_error(stall) |
-| F09 | AMS1117-3.3 LDO | 失效 | ESP32-S3 掉电 → WDT reset | Auto reboot |
-| F10 | WiFi connection | Disconnect | WIFI_EVENT_STA_DISCONNECTED | Auto reconnect every 10s |
-| F11 | WebSocket | Disconnect | WEBSOCKET_EVENT_DISCONNECTED | Auto reconnect every 3s |
-| F12 | NVS Partition | Corruption | nvs_flash_init fails | Auto erase + reinit |
-| F13 | NVS Write | Flash worn | nvs_set_u8 returns error | Log, continue with RAM cache |
-| F14 | Bias-T Voltage | Under-voltage (<10V) | ADC1_CH4 | health_alert → SYS_DEGRADED |
-| F15 | Bias-T Voltage | Over-voltage (>15V) | ADC1_CH4 | health_alert → SYS_DEGRADED |
-| F16 | Core Temperature | >80°C | Internal temp sensor | health_alert → disable auto-tune |
-| F17 | Task WDT | Task hung > 5s | ESP Task WDT panic | Auto reset |
-| F18 | cJSON Parse | Malformed JSON | cJSON_Parse returns NULL | Silent discard, no crash |
-| F19 | Send Queue | Full (16 pending) | xQueueSend timeout | Drop oldest message |
+V3.0 deliberately removes the onboard SWR bridge, current sense, servo position feedback and relay array. The ATU is therefore a remote servo actuator, not a self-contained RF measuring instrument.
 
-## 2. Top 5 FMEA
+| Signal source | Available in firmware | Notes |
+|------|:------:|------|
+| MRRC/ATR1000 SWR and forward power | Yes | Provided by WebSocket `tune_start` / `swr_update` messages |
+| Bias-T DC voltage | Yes | ADC1_CH4 through 47k/10k divider |
+| ESP32 internal temperature | Yes | ESP-IDF temperature sensor, coarse die temperature only |
+| WiFi / WebSocket connection state | Yes | ESP-IDF events and websocket callbacks |
+| NVS errors | Yes | Return codes from NVS APIs |
+| Servo command angle | Yes | Last commanded angle only |
+| Servo actual shaft position | No | MG996R has no position feedback output |
+| Servo current / stall current | No | No shunt/Hall/current monitor in V3.0 |
+| RF voltage at variable capacitor | No | No HV probe or detector |
+| RF current / transformer temperature | No | No RF/current/thermal sensors on tank |
 
-### F01: MG996R Servo Stall (RPN=60)
+**Implication**: Any FMEA item requiring actual servo movement, RF arc detection, transformer heating, or capacitor voltage sensing cannot be claimed as firmware-detectable in V3.0. It can only be inferred indirectly from SWR behavior or found during bench inspection.
 
-| Item | Detail |
-|------|--------|
-| Failure Mode | 齿轮/轴承卡滞, 电机无法转动 |
-| Effect | 调谐中断, 无法改变电容 |
-| Cause | 低温润滑失效(-20°C), 异物进入, 齿轮磨损 |
-| Detection | servo_detect_stall(): 3次 set_angle 后位置不变 |
-| Severity/Occurrence/Detection | S:5 (无法调谐), O:3, D:4 |
-| RPN | 5×3×4 = 60 |
-| Mitigation | 伺服断电 → tune_error(stall) → 定期维护/润滑 |
+---
 
-### F04: IRF9540 Open (RPN=40)
+## 2. Implemented Firmware Detection
 
-| Item | Detail |
-|------|--------|
-| Failure Mode | MOSFET 漏极开路, 伺服6V轨断开 |
-| Effect | 伺服不通电, 调谐失败 |
-| Cause | EOS/ESD, 过流烧毁, 栅极氧化层击穿 |
-| Detection | tune_engine 检测到连续stall |
-| RPN | 5×2×4 = 40 |
-| Mitigation | 选型裕度(IRF9540 -100V/-23A远大于6V/3A); 栅极10kΩ下拉保护 |
+These are backed by current firmware paths under `firmware-esp32/main/`.
 
-### F10: WiFi Disconnect (RPN=36)
+| ID | Fault / Event | Detection path | Current response | Evidence |
+|----|------|------|------|------|
+| D01 | Tune overpower | `tune_engine_feed_swr()`: `fwd_pwr_w > TUNE_POWER_MAX_W` | Abort tune, set error, servo to 0°, power off, send `tune_error(overpower)` | `tune_engine.c` |
+| D02 | RF lost during tune | `tune_engine_feed_swr()`: `fwd_pwr_w < TUNE_POWER_MIN_W` | Abort tune, set error, servo to 0°, power off, send `tune_error(no_rf)` | `tune_engine.c` |
+| D03 | No acceptable match | Best SWR remains `>= TUNE_MAX_ACCEPT_SWR` at end of sweep | Send `tune_error(high_swr)`; do not save cache | `tune_engine.c` |
+| D04 | Bias-T under/over voltage | `health_mon_tick()` ADC check outside `BIAS_V_MIN/MAX` | Send health alert, set `SYS_DEGRADED` while out of range | `health_mon.c` |
+| D05 | ESP32 die temperature high | `temperature_sensor_get_celsius() > CORE_TEMP_MAX_C` | Set `SYS_DEGRADED`; currently no health alert JSON for temp | `health_mon.c` |
+| D06 | WiFi disconnect | `WIFI_EVENT_STA_DISCONNECTED` | Mark disconnected, delay, reconnect | `ws_client.c` |
+| D07 | WebSocket disconnect/error | `WEBSOCKET_EVENT_DISCONNECTED/ERROR` | Mark disconnected; IDF websocket auto-reconnect enabled | `ws_client.c` |
+| D08 | Malformed JSON | `cJSON_Parse()` returns NULL or missing `cmd` | Drop message silently | `ws_client.c` |
+| D09 | NVS partition init failure / version mismatch | `nvs_flash_init_partition()` return code | Erase tune partition and reinit | `nvs_cache.c` |
+| D10 | NVS save/commit failure | `nvs_set_u8()` / `nvs_commit()` return code | Log error, continue without persisted cache | `nvs_cache.c` |
+| D11 | Task lockup | ESP-IDF WDT if enabled by project config | Reset by ESP-IDF | SDK config / runtime |
 
-| Item | Detail |
-|------|--------|
-| Failure Mode | WiFi信号丢失 (距离/干扰/路由器重启) |
-| Effect | MRRC无法控制ATU; 本地缓存仍可用 |
-| Detection | WIFI_EVENT_STA_DISCONNECTED |
-| RPN | 4×3×3 = 36 |
-| Mitigation | Auto reconnect 10s间隔; LED闪烁指示; 缓存不依赖WiFi |
+---
 
-### F12: NVS Corruption (RPN=28)
+## 3. Not Firmware-Detectable In V3.0
 
-| Item | Detail |
-|------|--------|
-| Failure Mode | NVS partition 数据损坏 (掉电时写入) |
-| Effect | 缓存丢失 → 冷启动需全扫描重建 |
-| Detection | nvs_flash_init returns error |
-| RPN | 4×2×4 = 28 |
-| Mitigation | Auto erase + reinit |
+These risks are real, but current hardware has no sensor path to detect them directly.
 
-### F14: Bias-T Under-voltage (RPN=18)
+| ID | Fault | Why firmware cannot prove it | Practical detection | Engineering control |
+|----|------|------|------|------|
+| N01 | Servo mechanical stall | Only commanded angle is known; actual shaft position/current are unknown | Bench observation, abnormal noise, SWR not changing during sweep | Good mechanical alignment, gear guard, current sensor in next revision |
+| N02 | Servo stripped gear / coupler slip | PWM command can change while capacitor does not move | SWR curve flat across commanded sweep; visual inspection | Locking hardware, witness marks on shaft/gears, periodic inspection |
+| N03 | IRF9540 open / 2N2222 open | No VCC_SERVO ADC measurement | Bench measure HDR_SERVO VCC during `servo_power_on()` | Add servo rail divider/test point; verify before RF testing |
+| N04 | IRF9540 short | Firmware cannot measure servo rail when idle | Servo buzz/heat when idle; bench measure VCC_SERVO after power-off | Gate pull-up to source, idle current check |
+| N05 | Variable capacitor arc-over | No RF voltage/light/acoustic sensor | SWR sudden jump, visible marks, audible snap during low-power test | Transmitter-grade capacitor, smooth HV wiring, adequate spacing, dry enclosure |
+| N06 | T200-6 overheating | No tank temperature sensor | IR camera / thermal probe after key-down test | 5W tune limit, duty-cycle limit, post-build thermal test |
+| N07 | HV_GAP misfire | No RF detector around gap | Visible/audible discharge, erratic SWR | Default DNP; install only after bench confirmation |
+| N08 | Water ingress | No humidity sensor | Inspection, corrosion, unstable ADC/WiFi | IP66 seals, PTFE vent, desiccant, maintenance interval |
+
+Do not expose any of these as guaranteed `servo_stall` or `arc_detected` firmware errors unless new sensors are added.
+
+---
+
+## 4. High-Risk Engineering Items
+
+### 4.1 HV Variable Capacitor Arc-Over
 
 | Item | Detail |
-|------|--------|
-| Failure Mode | DC供电<10V (线路损耗/电源故障) |
-| Effect | 伺服无力, ESP32可能欠压 |
-| Cause | Bias-T电源故障, 同轴过长压降大 |
-| RPN | 3×2×3 = 18 |
-| Mitigation | health_alert → SYS_DEGRADED → 限制调谐 |
+|------|------|
+| Failure mode | Plate arc-over, contamination tracking, or permanent plate short |
+| Severity | High: can damage capacitor, detune antenna, carbonize supports |
+| Detection rating | Poor in firmware; must be bench/visual/audio/SWR inferred |
+| Primary control | Use transmitter-grade air variable capacitor, working voltage >=5kV or plate spacing >=1.5mm |
+| Layout control | RF hot end off-PCB, >=15mm clearance to low-voltage wiring, rounded solder joints, dry enclosure |
+| Protection | `HV_GAP` footprint only; default DNP; no 90V/200V GDT on RF hot end |
+| Test | 40m first, <=5W tune power, dark-room visual/audible arc check, inspect plates after test |
 
-## 3. POST (3-Phase)
+### 4.2 Servo / Gear Train Failure
 
-| Phase | Check | Method | Failure Action |
-|-------|-------|--------|---------------|
-| PHASE_0: DC | ESP32-S3 3.3V 供电正常 | 代码能执行 = 供电OK | — |
-| PHASE_1: WiFi | WiFi STA initialized | esp_wifi_init check | Retry 3次 → LED fast blink |
-| PHASE_2: Servo | 伺服范围测试 | set_angle(90°)→delay→set_angle(0°) | 失败=SYS_DEGRADED |
+| Item | Detail |
+|------|------|
+| Failure mode | Stall, gear tooth skip, set screw slip, capacitor end-stop collision |
+| Severity | Medium/High: ATU cannot tune or may force capacitor plates |
+| Detection rating | Poor in firmware; no position/current feedback |
+| Primary control | Mechanical end-stop margin, gear backlash 0.1-0.2mm, full 0-180° dry run before RF |
+| Test | Manual sweep 0°, 90°, 180°; verify capacitor Cmin/Cmax and no end-stop binding |
+| Next revision | Add servo current sense or position feedback; then implement real stall detection |
 
-## 4. Health State Machine
+### 4.3 WiFi / MRRC Dependency
 
-```
-  POST PASS ──▶ SYS_HEALTHY
-                    │
-     servo stall 3次 / bias voltage / core temp >80°C
-                    ▼
-               SYS_DEGRADED (仍可调谐, 仅告警)
-                    │
-     连续3次 tune fail / WDT触发
-                    ▼
-               SYS_SAFE (伺服归零, 禁止自动调谐)
-                    │
-     ONLY exit: power cycle + POST pass
-```
+| Item | Detail |
+|------|------|
+| Failure mode | WiFi/MRRC/ATR1000 unavailable |
+| Severity | Medium: ATU cannot perform new tune; cached mechanical position remains physical |
+| Detection rating | Good for WiFi/WS disconnect, external for ATR1000 availability |
+| Current control | Auto reconnect; LED indication; NVS cache survives reboot |
+| Residual risk | No offline SWR fallback in V3.0 |
 
-## 5. Degradation Strategies
+### 4.4 Bias-T Supply Fault
 
-| Condition | Strategy |
-|-----------|----------|
-| 1-2次 tune fail | 允许重试, 清除 cooldown |
-| 3次 consecutive tune fail | SYS_SAFE → 伺服归零 → 禁止自动调谐 |
-| WiFi disconnect | 不影响本地缓存; 仅限制远程命令 |
-| NVS cache miss | 全扫描建立新缓存 (~8s) |
-| Bias-V out of range | DEGRADED: 仅告警, 不限制 (可能为暂时波动) |
-| Core temp >80°C | 禁止自动调谐, wait cooldown, 每30s重检 |
+| Item | Detail |
+|------|------|
+| Failure mode | DC rail too low/high, long coax drop, supply transient |
+| Severity | Medium: servo weak, ESP32 unstable, DC-DC stress |
+| Detection rating | Good for 12V rail through ADC divider |
+| Current control | Health alert and `SYS_DEGRADED`; tune disable is not yet enforced in code |
+| Test | Sweep supply to 9V and 16V; verify alert and state transition |
 
-## 6. Fault Injection Test Cases
+---
 
-| Test | Method | Expected |
-|------|--------|----------|
-| Servo stall | 物理卡住伺服臂, 触发 tune_start | tune_error(stall), MOSFET断电, SYS_DEGRADED |
-| WiFi disconnect | 关闭路由器 | LED fast blink, auto reconnect |
-| Bias under-voltage | 降低Bias-T电源到9V | health_alert, SYS_DEGRADED |
-| NVS corruption | Erase nvs_tune partition mid-write | Auto reformat, cold sweep |
-| Malformed JSON | Send invalid JSON to /atu WS | Silent discard, no crash |
-| Overpower during tune | fwd_pwr_w=100 | tune_error(overpower), servo to zero |
-| RF lost during tune | fwd_pwr_w=0.1 | tune_error(no_rf), servo to zero |
-| Send queue full | Flood 32 messages | Queue oldest drop, system stable |
+## 5. State Handling Reality Check
 
-## 7. Diagnostic Data
+Current `sys_health_t` has `SYS_HEALTHY`, `SYS_DEGRADED`, and `SYS_SAFE`, but the implemented health monitor only toggles between healthy and degraded for ADC/temp conditions. It does not currently count tune failures, enforce a safe latch, or block tuning.
 
-`get_status` response: `{pos, cache_hits, health, uptime}`
+| State | Implemented behavior | Not yet implemented |
+|------|------|------|
+| `SYS_HEALTHY` | Default state when Bias-V/temp are normal | None |
+| `SYS_DEGRADED` | Set when Bias-V out of range or temp too high; clears when normal | Does not automatically block tune |
+| `SYS_SAFE` | Enum exists | No latch logic, no 3-fail counter, no recovery rule |
 
-UART0 debug (115200bps): servo position, NVS stats, WiFi RSSI, Bias-V, core temp via esp_log.
+If `SYS_SAFE` is required, add explicit code before documenting it as a delivered safety feature.
 
-## 8. MTBF Estimation
+---
 
-| Component | λ (FIT) | Qty | Total FIT |
-|-----------|:-------:|:---:|:---------:|
-| ESP32-S3 module | 200 | 1 | 200 |
-| MG996R servo | 500 | 1 | 500 |
-| IRF9540 MOSFET | 50 | 1 | 50 |
-| LM2596 DC-DC | 100 | 1 | 100 |
-| LM2940CT LDO | 50 | 1 | 50 |
-| AMS1117 LDO | 30 | 1 | 30 |
-| 2N2222A NPN | 20 | 2 | 40 |
-| T200-6 core | 5 | 1 | 5 |
-| Variable capacitor | 300 | 1 | 300 |
-| GDT | 10 | 1 | 10 |
-| Passives (~25 R/C) | 2 | 25 | 50 |
-| Solder joints (~100) | 1 | 100 | 100 |
-| **Total** | | | **1,435 FIT** |
+## 6. Bench Verification Matrix
 
-MTBF ≈ 1×10^9 / 1435 ≈ **697,000 hours ≈ 80 years** (不含极端环境加速因子)
+| Test | Method | Expected result | Pass criteria |
+|------|------|------|------|
+| Servo power polarity | Measure HDR_SERVO VCC while calling `servo_power_on/off` | ON=6V, OFF=0V | Confirms GPIO2 HIGH enables P-MOS gate pulldown path |
+| Dry servo travel | Command 0°, 90°, 180° without RF | Smooth motion, no end-stop bind | Cmin/Cmax reached with mechanical margin |
+| NVS save/lookup | Tune/save at one frequency, reboot, tune same frequency | Cache hit, direct position | No full sweep on same frequency |
+| NVS fuzzy lookup | Tune 14.200MHz, request 14.205MHz | Cache hit within tolerance | Nearest cache used |
+| Overpower abort | Send `swr_update` with `fwd_pwr_w=100` during tune | `tune_error(overpower)` and servo off | No further sweep movement |
+| RF lost abort | Send `swr_update` with `fwd_pwr_w=0.1` during tune | `tune_error(no_rf)` and servo off | No further sweep movement |
+| High-SWR failure | Tune into dummy/non-resonant setup | `tune_error(high_swr)` | No NVS save for failed tune |
+| Bias low alert | Bias supply at 9V | Health alert and `SYS_DEGRADED` | Restores when voltage normal |
+| Bias high alert | Bias supply at 16V | Health alert and `SYS_DEGRADED` | Restores when voltage normal |
+| WiFi reconnect | Power-cycle AP | Disconnect indication, reconnect after AP returns | WS resumes |
+| HV arc margin | 40m, <=5W tune, observe in dark | No arc/snap/tracking | Inspect capacitor and HV wiring |
+| HV_GAP DNP check | Confirm not installed by default | No low-voltage GDT across RF hot end | Prevents normal RF misfire |
 
-## 9. Maintenance Schedule
+---
+
+## 7. Maintenance Schedule
 
 | Interval | Action |
-|----------|--------|
-| Monthly | 检查 SWR 曲线(MRRC趋势), 确认齿轮无异响 |
-| 6-month | 开壳检查: 齿轮磨损、接线松动、GDT 状态、干燥剂 |
-| Annual | 抽检 NVS 缓存完整性, 检查防水密封 |
-| On fault | MRRC health_alert → 按FMEA指示修复 |
+|------|------|
+| Monthly | Review MRRC SWR trends; listen for servo/gear noise during a short dry sweep |
+| 6 months | Open enclosure: inspect gear wear, set screws, RF hot-end clearance, capacitor plates, arc marks, moisture, desiccant |
+| Annual | Verify Cmin/Cmax, re-check Bias-V ADC calibration, erase/rebuild NVS cache if mappings look stale |
+| After any arc event | Stop using at 100W; clean/inspect capacitor and insulators; repeat low-power dark-room test |
 
 ---
 
-> **关联文档**: [`SDD.md`](SDD.md) · [`../hardware/SCH_Description.md`](../hardware/SCH_Description.md)
+## 8. Design Actions For Next Revision
+
+| Priority | Action | Reason |
+|------|------|------|
+| High | Add servo rail voltage sense or current sense | Enables real detection of MOSFET open/short and servo stall current |
+| High | Add tune timeout / SWR-update timeout in `tune_engine` | Prevent indefinite wait if MRRC stops sending updates mid-sweep |
+| Medium | Implement `SYS_SAFE` latch and 3-fail counter | Makes documented health FSM enforceable |
+| Medium | Add optional local low-accuracy SWR bridge | Removes complete dependency on WiFi/MRRC for emergency tuning |
+| Low | Add humidity or enclosure leak indicator | Improves outdoor maintenance planning |
+
+---
+
+> **Related documents**: [`SDD.md`](SDD.md) · [`../hardware/SCH_Description.md`](../hardware/SCH_Description.md) · [`../hardware/PCB_Description.md`](../hardware/PCB_Description.md) · [`V3_MIGRATION_CHECKLIST.md`](V3_MIGRATION_CHECKLIST.md)

@@ -45,19 +45,25 @@ bool nvs_cache_lookup(uint32_t freq_hz, uint8_t *pos) {
     uint16_t base_khz = (uint16_t)(freq_hz / 1000);
     int8_t tolerance = 5;  /* ±50kHz at 10kHz steps */
 
-    for (int8_t offset = -tolerance; offset <= tolerance; offset++) {
-        char key[16];
-        int len = snprintf(key, sizeof(key), "%s%u",
-                          NVS_KEY_PREFIX, base_khz + (uint16_t)(offset * 10));
-        if (len < 0 || len >= (int)sizeof(key)) continue;
+    for (int8_t delta = 0; delta <= tolerance; delta++) {
+        int8_t offset_count = (delta == 0) ? 1 : 2;
+        for (int8_t i = 0; i < offset_count; i++) {
+            int8_t offset = (i == 0) ? delta : -delta;
+            int32_t search_khz = (int32_t)base_khz + ((int32_t)offset * 10);
+            if (search_khz <= 0 || search_khz > UINT16_MAX) continue;
 
-        uint8_t out = 0;
-        size_t size = sizeof(out);
-        esp_err_t err = nvs_get_blob(cache_handle, key, &out, &size);
-        if (err == ESP_OK) {
-            *pos = out;
-            cache_hit_count++;
-            return true;
+            char key[16];
+            int len = snprintf(key, sizeof(key), "%s%u",
+                               NVS_KEY_PREFIX, (uint16_t)search_khz);
+            if (len < 0 || len >= (int)sizeof(key)) continue;
+
+            uint8_t out = 0;
+            esp_err_t err = nvs_get_u8(cache_handle, key, &out);
+            if (err == ESP_OK) {
+                *pos = out;
+                cache_hit_count++;
+                return true;
+            }
         }
     }
     return false;
