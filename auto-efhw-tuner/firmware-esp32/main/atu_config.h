@@ -67,6 +67,10 @@
 #define TUNE_EARLY_EXIT_SWR     1.05f
 #define TUNE_MAX_ACCEPT_SWR     2.0f
 #define TUNE_FINE_THRESHOLD_SWR 1.5f
+/* Max wait for an swr_update between sweep steps before aborting the tune.
+ * Guards against MRRC/WebSocket stalling mid-sweep, which would otherwise
+ * leave the MG996R servo powered indefinitely (overheat risk). */
+#define TUNE_SWR_TIMEOUT_MS     4000
 
 // ============================================================
 // 6. NVS Tune Cache

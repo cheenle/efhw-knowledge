@@ -41,6 +41,7 @@ static void tune_engine_task(void *pvParameters) {
     tune_engine_set_event_callback(tune_event_handler);
 
     while (1) {
+        tune_engine_tick();
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }

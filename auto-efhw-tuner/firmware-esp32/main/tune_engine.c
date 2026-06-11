@@ -39,8 +39,20 @@ static uint8_t  best_pos = 0;
 static float    best_swr = 999.0f;
 static uint32_t tune_start_ms = 0;
 static bool     swr_pending = false;
+static uint32_t swr_wait_start_ms = 0;
 
 static uint8_t  fine_center = 0;
+
+static inline uint32_t now_ms(void) {
+    return xTaskGetTickCount() * portTICK_PERIOD_MS;
+}
+
+/* Mark that we are now waiting for the next swr_update, and stamp the time so
+ * tune_engine_tick() can enforce TUNE_SWR_TIMEOUT_MS. */
+static inline void arm_swr_wait(void) {
+    swr_pending = true;
+    swr_wait_start_ms = now_ms();
+}
 
 #define COARSE_MAX_STEP (SERVO_SWEEP_DEGREES / SERVO_COARSE_STEP_DEG)
 
@@ -132,7 +144,7 @@ void tune_engine_start(uint32_t freq_hz, float initial_swr) {
         if (json) { event_cb(json); free(json); }
     }
 
-    swr_pending = true;
+    arm_swr_wait();
 }
 
 void tune_engine_feed_swr(float swr, float fwd_pwr_w) {
@@ -205,7 +217,7 @@ void tune_engine_feed_swr(float swr, float fwd_pwr_w) {
                 if (json) { event_cb(json); free(json); }
             }
         }
-        swr_pending = true;
+        arm_swr_wait();
     }
     else if (phase == TUNE_PHASE_FINE_SWEEP) {
         fine_step++;
@@ -227,7 +239,7 @@ void tune_engine_feed_swr(float swr, float fwd_pwr_w) {
                 if (json) { event_cb(json); free(json); }
             }
         }
-        swr_pending = true;
+        arm_swr_wait();
     }
 
     return;
@@ -262,6 +274,34 @@ void tune_engine_abort(void) {
     ESP_LOGI(TAG, "Tune aborted");
     phase = TUNE_PHASE_ABORTED;
     atu_state = ATU_IDLE;
+    swr_pending = false;
     servo_set_angle(0);
     servo_power_off();
+}
+
+void tune_engine_tick(void) {
+    /* Only meaningful while a sweep step is waiting for an swr_update. */
+    if (!swr_pending) return;
+    if (phase != TUNE_PHASE_COARSE_SWEEP && phase != TUNE_PHASE_FINE_SWEEP) {
+        return;
+    }
+
+    if (now_ms() - swr_wait_start_ms < TUNE_SWR_TIMEOUT_MS) {
+        return;
+    }
+
+    /* MRRC/WebSocket stopped feeding SWR mid-sweep. Abort and cut servo power
+     * so the MG996R cannot sit energized (and overheating) indefinitely. */
+    ESP_LOGW(TAG, "SWR update timeout (%dms) — aborting tune, servo power off",
+             TUNE_SWR_TIMEOUT_MS);
+    phase = TUNE_PHASE_ABORTED;
+    atu_state = ATU_ERROR;
+    swr_pending = false;
+    servo_set_angle(0);
+    servo_power_off();
+
+    if (event_cb) {
+        char *json = proto_build_tune_error(TUNE_ERR_TIMEOUT);
+        if (json) { event_cb(json); free(json); }
+    }
 }

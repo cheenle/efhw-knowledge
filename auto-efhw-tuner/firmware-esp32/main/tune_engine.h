@@ -14,6 +14,11 @@ void tune_engine_start(uint32_t freq_hz, float initial_swr);
 void tune_engine_feed_swr(float swr, float fwd_pwr_w);
 void tune_engine_abort(void);
 
+/* Periodic watchdog: call from the tune task loop. Aborts the tune and cuts
+ * servo power if no swr_update has arrived within TUNE_SWR_TIMEOUT_MS while a
+ * sweep step is pending. */
+void tune_engine_tick(void);
+
 atu_state_t tune_engine_get_state(void);
 uint8_t tune_engine_get_progress_pct(void);
 tune_result_t tune_engine_get_result(void);
