@@ -8,7 +8,7 @@ Sources (produced earlier in this test session):
 Each record is tagged:
   role   : 'dut' (BG1SB, antenna changed) | 'probe' (ON80, antenna fixed)
   config : 'A' (before switch) | 'B' (after switch), by the 12:26:52 CST cut
-  band   : derived from frequency (we keep only 15m here but tag anyway)
+  band   : derived from frequency (all bands imported; filter at query time)
   distance_km / bearing : computed at import time vs each monitored station's grid
 
 Idempotent: TRUNCATE then full reload (dataset is ~1e4 rows).
@@ -36,7 +36,6 @@ DB_CONFIG = {
 }
 
 TEST_ID = "efhw_49un_vs_lc_20260619"
-SWITCH_TS = 1781843212           # 2026-06-19 12:26:52 CST
 DUT_CALL = "BG1SB"
 DUT_GRID = "ON80da"
 
@@ -197,24 +196,55 @@ def load_dut_adif(paths):
 DUT_ADIF_SOURCES = [
     os.path.join(HERE, "pskr_bg1sb_full.adi"),
     os.path.join(HERE, "pskr_ab_fresh.adi"),
+    os.path.join(HERE, "pskr_a2_fresh.adi"),
 ]
 
 
-def build_rows():
-    """Yield tuples ready for INSERT. Only 15m FT8 retained."""
+def load_timeline(cursor):
+    """Load the switch timeline from efhw_ab_switches, ordered by time.
+
+    Returns a list of (start_ts, config, segment) sorted ascending. Each
+    record is assigned to the last segment whose switch_time <= its qso_time.
+    Records before the first switch are dropped (no known config).
+    """
+    cursor.execute(
+        """SELECT switch_time, config, segment FROM efhw_ab_switches
+           WHERE test_id=%s ORDER BY switch_time ASC""",
+        (TEST_ID,),
+    )
+    timeline = []
+    for switch_time, config, segment in cursor.fetchall():
+        ts = int(switch_time.replace(tzinfo=CST).timestamp())
+        timeline.append((ts, config, segment))
+    return timeline
+
+
+def resolve_segment(t, timeline):
+    """Return (config, segment) for timestamp t, or (None, None) if before all."""
+    found = None
+    for ts, config, segment in timeline:
+        if t >= ts:
+            found = (config, segment)
+        else:
+            break
+    return found if found else (None, None)
+
+
+def build_rows(timeline):
+    """Yield tuples ready for INSERT. All bands and modes retained."""
     rows = []
 
     def make_row(monitored, role, home_grid, r):
         freq = int(r.get("freq", 0))
         band = band_of(freq)
-        if band != '15m':
-            return None
-        if (r.get("mode", "") or "").upper() != "FT8":
-            return None
+        if not band:
+            return None   # unknown/out-of-plan frequency
         t = r.get("t")
         if not t:
             return None
-        config = 'A' if t < SWITCH_TS else 'B'
+        config, segment = resolve_segment(t, timeline)
+        if config is None:
+            return None   # before the first known switch — unknown config
         qso_time = datetime.fromtimestamp(t, CST).strftime("%Y-%m-%d %H:%M:%S")
         # distance/bearing from monitored station's home grid to receiver
         hlat, hlon = grid_to_latlon(home_grid)
@@ -225,7 +255,7 @@ def build_rows():
             bear = round(bearing(hlat, hlon, rlat, rlon), 1)
         snr = r.get("snr")
         return (
-            TEST_ID, monitored, role, config,
+            TEST_ID, monitored, role, config, segment,
             r.get("rx", ""), r.get("loc", ""), r.get("dxcc", ""),
             r.get("mode", ""), snr, freq, band, dist, bear, qso_time,
         )
@@ -247,22 +277,23 @@ def build_rows():
 
 INSERT_SQL = """
 INSERT INTO efhw_ab_reports
-(test_id, monitored, role, config, rx_callsign, rx_locator, dxcc,
+(test_id, monitored, role, config, segment, rx_callsign, rx_locator, dxcc,
  mode, snr, frequency, band, distance_km, bearing, qso_time)
-VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
 """
 
 
 def verify(cursor):
     cursor.execute("""
-        SELECT role, config, COUNT(*) n, COUNT(DISTINCT rx_callsign) rx,
-               COUNT(DISTINCT monitored) mon, ROUND(AVG(snr),2) avg_snr
+        SELECT role, segment, config, COUNT(*) n, COUNT(DISTINCT rx_callsign) rx,
+               COUNT(DISTINCT monitored) mon, ROUND(AVG(snr),2) avg_snr,
+               MIN(qso_time) t0, MAX(qso_time) t1
         FROM efhw_ab_reports WHERE test_id=%s
-        GROUP BY role, config ORDER BY role, config
+        GROUP BY role, segment, config ORDER BY role, segment
     """, (TEST_ID,))
-    print(f"{'role':<7}{'cfg':<5}{'rows':>7}{'uniqRX':>8}{'mon':>5}{'avgSNR':>8}")
+    print(f"{'role':<7}{'seg':<5}{'cfg':<4}{'rows':>7}{'uniqRX':>8}{'mon':>5}{'avgSNR':>8}  window")
     for r in cursor.fetchall():
-        print(f"{r[0]:<7}{r[1]:<5}{r[2]:>7}{r[3]:>8}{r[4]:>5}{str(r[5]):>8}")
+        print(f"{r[0]:<7}{str(r[1]):<5}{r[2]:<4}{r[3]:>7}{r[4]:>8}{r[5]:>5}{str(r[6]):>8}  {r[7]}->{r[8]}")
 
 
 def main():
@@ -273,8 +304,10 @@ def main():
         cursor.close(); conn.close()
         return
 
-    rows = build_rows()
-    print(f"built {len(rows)} rows (15m FT8)")
+    timeline = load_timeline(cursor)
+    print("timeline:", [(s, c) for _, c, s in timeline])
+    rows = build_rows(timeline)
+    print(f"built {len(rows)} rows")
     cursor.execute("TRUNCATE TABLE efhw_ab_reports")
     # batch insert
     B = 500
