@@ -1,0 +1,4 @@
+{"config": "A: 49:1 (3xFT-240-51), 100W, no tuner", "band": "15m 21.074 MHz FT8", "fetched_at": "2026-06-19 12:12:27 CST", "window_cst": "12:02:15-12:10:45", "reports": 92, "rx_stations": 91, "countries": 19, "snr_avg": -14.6, "snr_min": -25, "snr_max": 7}
+{"config": "A: 49:1 check2", "fetched_at": "2026-06-19 12:15:24 CST", "window_cst": "12:02:15-12:14:15", "reports": 113, "rx_stations": 112, "countries": 22, "snr_avg": -15.1, "snr_min": -25, "snr_max": 7}
+{"marker": "CONFIG_SWITCH", "from": "A: 49:1 (3xFT-240-51)", "to": "B: LC tuner", "switch_time_cst": "2026-06-19 12:26:52", "note": "900s rolling window; config A tail persists until ~12:42. Use B start >= ~12:42 (or actual TX-start time) for clean slice."}
+{"event": "swr_marker", "fetched_at": "2026-06-19 13:19:01 CST", "swr_A_49to1": 1.47, "swr_B_LC": 1.3, "freq": "21.074 MHz"}
