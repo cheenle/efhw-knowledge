@@ -63,6 +63,7 @@
 | 1.85m 串 L → 四波段独立对齐免天调 | ❌ 证伪 | 串联元件承载全部馈点电流；[PA3HHO](https://pa3hho.wordpress.com/end-fed-antennes/multiany-band-end-fed-english/)、[ON7EQ](https://www.qsl.net/on7eq/projects/efhw_antenna.htm)（110µH 线圈 SWR<3 仅 20kHz）、[VK3IL](https://vk3il.net/projects-antenna/trapped-five-band-efhw-sota-antenna/)、[AI6XG](https://www.ai6xg.com/post/trapped-20-30-40-meter-efhw-antenna) 全部记录强波段耦合 |
 | 铝盒寄生电容下拉谐振 | ✅ 实锤 | Owen：次级寄生电容裸装 2.7pF→入盒 6.0pF（工程篇）；[Orderwire](https://theorderwire.com/2023-08-15/linked-efhw-what-if-we-remove-the-conductive-eyebolt/)：导电吊环挪 26kHz、手靠近挪 248kHz。社区规范=塑料壳 |
 | 换磁芯改变仰角/DX 方向性 | ❌ 证伪 | 损耗等比缩放方向图。Sloper 固有弱方向性（偏向下坡端，20m 低端 ~+1.5dBi@20°，高端 −11dBi，[KK4OBI 4NEC2](https://www.qsl.net/kk4obi/EFHW%20Sloping.html)）与磁芯无关 |
+| 换芯后存在"代差级 DX 增益" | ❌ **本库实测直接证伪** | 2026-06-19 端到端 A/B（21.074 FT8/100W/同一天线，49:1 3×FT240-51 vs LC 调谐器）：ΔSNR 净差 −0.3～−0.75dB，落在 ±1dB 测量噪声内，**统计不可区分**——见仓库根 `EFHW_49to1_vs_LC_测试报告_20260619.md`（含脚本/ADIF/探针全链可复算） |
 | "43 太高效 → 共模倾泻回机房" | ⚠️ 机理倒置 | EFHW 共模由尾线电长度与端阻抗决定；43 料自身是损耗性 CM 阻抗（[PA0NHC](https://www.pa0nhc.nl/CommonModeChokes/indexE.htm)：阻性为主的扼流才消 CM）。损耗大的旧盒"消 CM"实为连有用功率一起烧。结论不变：室外 CMC 该装，但理由换掉 |
 | CMC 用 FT240-43 绕 15–17 匝 | ❌ 过度 | 本库既有规程 6–10 匝（`references/efhw_cmc.md`，W8JI 口径）；15 匝以上自谐振下移反损高频扼流。L_bias 用 15 匝是 FT37-43 偏置隔 RF，用途不同勿混淆 |
 | 2:14+130pF 银云母补偿 | ✅ 有实测背书 | Owen 配方即 2:14+~100pF；无补偿 ">15MHz 变差"，有补偿 1–30MHz IVSWR<2；**但补偿电容掩 VSWR 且增大高频芯损**（Owen/PA3HHO 警告），130pF 与"500V 耐压不足须两 240–270pF 串联"建议保留为工程改进项 |
@@ -96,5 +97,7 @@ N6CC 石蜡测试、AA5TB <0.5dB 实测、README §8 N6CC 方向图数据。
 
 ## 6. 待实测清单（回填本表即闭环）
 
-见 [[transformer_ab_protocol]]：P1 新旧盒 S21 逐带效率｜P2 2643 铝盒 60s/100W 红外热像
+**已完成**：21MHz 端到端 A/B（49:1 变压器 vs LC 调谐器，2026-06-19，`EFHW_49to1_vs_LC_测试报告_20260619.md`）——天线级效率差统计不可区分。
+**待执行**：见 [[transformer_ab_protocol]]：P1 新旧盒 S21 逐带效率｜P2 2643 铝盒 60s/100W 红外热像
 （40m+10m 双科目）｜P3 合盖/开盖谐振位移｜P4 CMC 三点位 A/B｜P5 V3.0 伺服 basin 宽度。
+现场记录：[[transformer_ab_log-2026-08]] ｜ 判据速算：`scripts/ab_judge.py`。

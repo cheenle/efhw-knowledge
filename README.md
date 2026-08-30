@@ -766,6 +766,7 @@ V3.0 从 STM32F103 + 继电器切换固定电容全面重构为 **ESP32-S3 + 伺
 | **DMEGC Ni-Zn 磁环 EFHW 工程分析** 🆕 | **BG1SB / Hermes** | **2026-05-24** | **`references/dmegc_nizn_toroid.md`** |
 | **磁芯换装证据裁决 (3×51→2643251002)** 🆕 | **BG1SB / Claude 研究组** | **2026-08-30** | **`references/core-swap-evidence-2026-08.md`** |
 | **变换器 A/B 实测协议** 🆕 | **BG1SB** | **2026-08-30** | **`references/transformer_ab_protocol.md`** |
+| **EFHW 49:1 vs LC 调谐器 21MHz 端到端 A/B 实测报告** 🆕 | **BG1SB** | **2026-06-19** | **`EFHW_49to1_vs_LC_测试报告_20260619.md`** |
 | **🆕 The CFHW — EFHW vs Dipole for Portable Ops** | **VA3KOT (John)** | **2026-03-04** | **hamradiooutsidethebox.ca** |
 | **🆕 AA5TB Parallel L-C EFHW Coupler 实验** | **VA3KOT (John)** | **2026-02-04** | **hamradiooutsidethebox.ca** |
 | **🆕 100W 全自动谐振式 EFHW 调谐适配器 — 完整工程设计** | **BG1SB** | **2026-06-07** | **`references/auto_efhw_tuner_design_full.md`** |
