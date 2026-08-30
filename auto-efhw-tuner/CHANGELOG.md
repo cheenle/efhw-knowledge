@@ -6,6 +6,10 @@ All notable changes to the EFHW Auto Tuner project.
 
 ## [V3.0] — 2026-06-08 — Fuchs ATU (Current)
 
+### 2026-08-30 — Docs
+- 测试手册增设 §10 变换器 A/B 验收与功率红线（3×FT240-51 → 2643251002 换装）
+- 证据链入库：`references/core-swap-evidence-2026-08.md`（撤回 DG0SNC 引用，改用 Owen Duffy / MM0OPX / N1FD 实测链）+ `references/transformer_ab_protocol.md`
+
 ### Architecture
 - **MCU**: ESP32-S3-WROOM-1 (240MHz dual-core Xtensa LX7, 16MB Flash)
 - **Core**: T200-6 ×1 (Type 6 Carbonyl Iron, μ=8), 2:14 turns → 49:1

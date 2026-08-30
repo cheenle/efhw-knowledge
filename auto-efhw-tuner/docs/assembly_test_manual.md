@@ -257,4 +257,26 @@ RF二次侧热端可能出现数kV峰值。所有焊点必须圆滑, 不留尖�
 
 ---
 
-> **关联文档**: [`V3_MIGRATION_CHECKLIST.md`](V3_MIGRATION_CHECKLIST.md) · [`SDD.md`](SDD.md) · [`FDE.md`](FDE.md)
+## 10. 变换器台架验收（A/B 换装功率红线）
+
+> 适用范围：3×FT240-51 → Fair-Rite 2643251002 换装件。完整步骤与数据表见
+> [`../../references/transformer_ab_protocol.md`](../../references/transformer_ab_protocol.md)（P1/P2 科目），
+> 证据背景与红线推导见 `../../references/core-swap-evidence-2026-08.md` §4。
+
+**通过门（红线解除条件）**：
+
+| 科目 | 判据 | 未通过时的限制 |
+|---|---|---|
+| P1 S21 效率 | 两盒逐带差 <0.5dB 记录归档；≥1dB 差须附温升佐证 | 效率叙事以实测重写 |
+| P2 热测 40m | FT8 100W×60s×5 周期，盒壁稳态 ≤55°C，SWR 漂移 <0.2 | FT8/CW 3.5–7.3MHz **≤50W** |
+| P2 热测 10m | 同上（μ″ 主导损耗区，必测） | FT8/CW 21/28MHz **≤50W** |
+| 14MHz 基准 | P2 通过即背书 100W FT8 | 同上类推 |
+| 80m | — | 100W 连续**禁用**（不建议解除） |
+| SSB/PAT | — | 100W 可用（低占空比） |
+
+**复测周期**：每年 §9 全频段扫描时复跑 P2 任一科目；铝盒更换/加导热垫后须重跑。
+热测通过/失败结果一律回写 `core-swap-evidence-2026-08.md` §4/§6 表格。
+
+---
+
+> **关联文档**: [`V3_MIGRATION_CHECKLIST.md`](V3_MIGRATION_CHECKLIST.md) · [`SDD.md`](SDD.md) · [`FDE.md`](FDE.md) · 变换器证据链 [`../../references/core-swap-evidence-2026-08.md`](../../references/core-swap-evidence-2026-08.md)
