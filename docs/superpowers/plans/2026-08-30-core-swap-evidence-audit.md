@@ -22,7 +22,7 @@
 
 **Files:** Create `references/core-swap-evidence-2026-08.md`
 
-- [ ] Step 1: 写入以下全文：
+- [x] Step 1: 写入以下全文：
 
 ````markdown
 # 磁芯换装证据裁决 — 3×FT240-51 → Fair-Rite 2643251002
@@ -127,14 +127,14 @@ N6CC 石蜡测试、AA5TB <0.5dB 实测、README §8 N6CC 方向图数据。
 （40m+10m 双科目）｜P3 合盖/开盖谐振位移｜P4 CMC 三点位 A/B｜P5 V3.0 伺服 basin 宽度。
 ````
 
-- [ ] Step 2: `grep -c "fair-rite.com" references/core-swap-evidence-2026-08.md` ≥3；文件无 "TODO/TBD"。
-- [ ] Step 3: commit `docs: 磁芯换装证据裁决文档 (3xFT240-51 vs 2643251002)`
+- [x] Step 2: `grep -c "fair-rite.com" references/core-swap-evidence-2026-08.md` ≥3；文件无 "TODO/TBD"。
+- [x] Step 3: commit `docs: 磁芯换装证据裁决文档 (3xFT240-51 vs 2643251002)`
 
 ### Task 2: 新增 `references/transformer_ab_protocol.md`
 
 **Files:** Create `references/transformer_ab_protocol.md`
 
-- [ ] Step 1: 写入全文（结构：目的→P0 安全→P1 S21→P2 热→P3 自谐振→P4 现场扫频/合盖→P5 CMC→P6 调谐 basin→记录表 6 张→判据回写规则）。核心内容：
+- [x] Step 1: 写入全文（结构：目的→P0 安全→P1 S21→P2 热→P3 自谐振→P4 现场扫频/合盖→P5 CMC→P6 调谐 basin→记录表 6 张→判据回写规则）。核心内容：
 
 ````markdown
 # 变换器 A/B 实测协议 — 3×FT240-51 vs 2643251002
@@ -184,12 +184,12 @@ P4：| 频点 | 新盒底点kHz/带宽 | 旧盒 | 合盖-开盖Δ |
 P5/P6：同栏自加。
 ````
 
-- [ ] Step 2: 与裁决文档互链存在（grep `core-swap-evidence` 命中）。
-- [ ] Step 3: commit `docs: 变换器 A/B 实测协议`
+- [x] Step 2: 与裁决文档互链存在（grep `core-swap-evidence` 命中）。
+- [x] Step 3: commit `docs: 变换器 A/B 实测协议`
 
 ### Task 3: README §2 磁芯选型表重写（README.md:115–126）
 
-- [ ] Step 1: 将 117–126 行（表头行至"核心注意"段）整段替换为（新表含实测效率列+2643 行+匝数原则框+"磁饱和"措辞修正）：
+- [x] Step 1: 将 117–126 行（表头行至"核心注意"段）整段替换为（新表含实测效率列+2643 行+匝数原则框+"磁饱和"措辞修正）：
 
 | 磁芯 | 材质（数据表） | μᵢ | Ae (mm²) | 实测效率 @49:1（低功率 VNA） | 薄弱点 | 适用场景 |
 - 行：FT240-43 单只（Ni-Zn 43, 800, 161, ≈75–82%〔两源〕, 2T 低频 Xm 不足, 不推荐单只 QRO）；
@@ -201,12 +201,12 @@ P5/P6：同栏自加。
 - "FT240-51"（料号存疑：Amidon 无目录件、51 为 Fair-Rite 特殊订料；**零公开实测**；低 μᵢ 须更多匝, 本库旧 3 叠实物按待测件处理）。
 - 设计原则框：**损耗 ∝ 1/N_primary（磁芯大小几乎无关，Owen Duffy 量热实测）**；叠芯=买 Xm；43 料 >10MHz μ″ 主导 → 发热最恶区在 20–10m。数字均链接至 [[core-swap-evidence-2026-08]] §2。
 - "核心注意"段改写：80m 表现差根因 = 初级感抗不足 → 磁化电流分流 + μ″ 芯损上升（≤100W 下磁通密度距饱和两个数量级，非"磁饱和"）。
-- [ ] Step 2: 表下追加 124 行 DMEGC 旧"新发现"引言中 "80m 磁芯损耗仅 43%" 保留但补 "(Steinmetz 推导，未实测)"。
-- [ ] Step 3: commit `fix(readme): 磁芯选型表按实测证据重写，纠正 Mn-Zn 错标`
+- [x] Step 2: 表下追加 124 行 DMEGC 旧"新发现"引言中 "80m 磁芯损耗仅 43%" 保留但补 "(Steinmetz 推导，未实测)"。
+- [x] Step 3: commit `fix(readme): 磁芯选型表按实测证据重写，纠正 Mn-Zn 错标`
 
 ### Task 4: README 涡流论证重写（166–174 行）+ 259 行表
 
-- [ ] Step 1: 166–174 小节（标题"Ni-Zn vs Mn-Zn：高频涡流的隐藏优势"至"远低于 FT240-43"）整块替换为：
+- [x] Step 1: 166–174 小节（标题"Ni-Zn vs Mn-Zn：高频涡流的隐藏优势"至"远低于 FT240-43"）整块替换为：
 
 ```markdown
 #### 抑制料 vs 功率料：tanδ 才是主轴（2026-08-30 勘误重写）
@@ -222,37 +222,37 @@ P5/P6：同栏自加。
 - 若 DMEGC 功率料优于 FT240-43，预期来源 = 更低 tanδ + Ae 大 2.2× 使 B 减半（Pv∝B^2.5）。*推导，未实测*。
 ```
 
-- [ ] Step 2: 259–263 表格：列头 "Mn-Zn 铁氧体 (Mix 43)"→"Ni-Zn 抑制型铁氧体 (Mix 43)"；μ 850→800；"磁芯损耗 @30MHz 显著"→"磁芯损耗 @30MHz 显著（μ″ 主导，非涡流）"。268 行结论保留。
-- [ ] Step 3: commit `fix(readme): 涡流论证重写为 tanδ/电阻率家族内对比`
+- [x] Step 2: 259–263 表格：列头 "Mn-Zn 铁氧体 (Mix 43)"→"Ni-Zn 抑制型铁氧体 (Mix 43)"；μ 850→800；"磁芯损耗 @30MHz 显著"→"磁芯损耗 @30MHz 显著（μ″ 主导，非涡流）"。268 行结论保留。
+- [x] Step 3: commit `fix(readme): 涡流论证重写为 tanδ/电阻率家族内对比`
 
 ### Task 5: 存量三文档错标修复
 
-- [ ] Step 1: `references/dmegc_nizn_toroid.md`
+- [x] Step 1: `references/dmegc_nizn_toroid.md`
   - :63 `Fair-Rite Mix 43 (Mn-Zn, μ=850): Bs ≈ 320 mT` → `Fair-Rite Mix 43 (**Ni-Zn**, μ=800): B@10Oe = 3500 G`
   - :73 `| Mix 43 (Mn-Zn, μ=850) | >130°C | Mn-Zn Tc 通常低于 Ni-Zn |` → `| Mix 43 (Ni-Zn, μ=800) | >130°C | 数据表值 |`
   - :155–163（§2.6 标题至"核心优势"引言块）替换：`| Ni-Zn 抑制型 (Mix 43) | 1×10⁵ Ω·cm | — |`、`| Ni-Zn 功率型 (51) | 1×10⁹ Ω·cm | — |` 两行 + 结论改为"优势主轴是 tanδ 与配方；原'43=MnZn 涡流'论证前提不成立，见 [[core-swap-evidence-2026-08]]。整节 *推导待验*"。
   - 文档头部状态行追加：`> ⚠️ 2026-08-30 勘误：材料类别与 §2.6 论证已修正（[[core-swap-evidence-2026-08]]），Steinmetz/Ae 链仍成立。`
-- [ ] Step 2: `references/aa5tb_efha_analysis.md:164` → `- **慎用铁氧体**：Ni-Zn 抑制型铁氧体 (Mix 43/31/61) 在 10–30 MHz 磁芯损耗（μ″ 主导）显著增加`
-- [ ] Step 3: `references/efhw_ac_dual_mode.md` :72 `Mn-Zn Mix 43, μ=850`→`Ni-Zn Mix 43, μ=800（数据表）`；:87 列头改 `铁氧体 (Ni-Zn Type 43)`、μ 850→800；:90 `电阻率 1-10 Ω·m`→`≈1×10⁵ Ω·cm`；:91 行词改"磁芯损耗（μ″ 主导）随频率增大"；:258 改为 tanδ 轴表述（一句）。
-- [ ] Step 4: grep 验收：`grep -rn "Mn-Zn" README.md references/*.md | grep -iE "43|31|61"` 零命中。
-- [ ] Step 5: commit `fix(refs): 清除 Mix 43/31/61 的 Mn-Zn 错标及派生论证（3 文件）`
+- [x] Step 2: `references/aa5tb_efha_analysis.md:164` → `- **慎用铁氧体**：Ni-Zn 抑制型铁氧体 (Mix 43/31/61) 在 10–30 MHz 磁芯损耗（μ″ 主导）显著增加`
+- [x] Step 3: `references/efhw_ac_dual_mode.md` :72 `Mn-Zn Mix 43, μ=850`→`Ni-Zn Mix 43, μ=800（数据表）`；:87 列头改 `铁氧体 (Ni-Zn Type 43)`、μ 850→800；:90 `电阻率 1-10 Ω·m`→`≈1×10⁵ Ω·cm`；:91 行词改"磁芯损耗（μ″ 主导）随频率增大"；:258 改为 tanδ 轴表述（一句）。
+- [x] Step 4: grep 验收：`grep -rn "Mn-Zn" README.md references/*.md | grep -iE "43|31|61"` 零命中。
+- [x] Step 5: commit `fix(refs): 清除 Mix 43/31/61 的 Mn-Zn 错标及派生论证（3 文件）`
 
 ### Task 6: V3 测试手册 + CHANGELOG
 
-- [ ] Step 1: `auto-efhw-tuner/docs/assembly_test_manual.md` 在 `> **关联文档**` 行之前插入 `## 10. 变换器台架验收（A/B 换装红线）`：P1/P2 步骤引用 `../../references/transformer_ab_protocol.md`；通过门表=裁决文档 §4 红线表原样（FT8/CW 3.5–7.3MHz ≤50W…）+ 复测周期（每年 §9 全频段扫描时复跑 P2 单科目）。
-- [ ] Step 2: `auto-efhw-tuner/CHANGELOG.md` V3.0 节末追加：`### 2026-08-30 — Docs\n- 测试手册 §10 变换器 A/B 验收与功率红线；证据链 references/core-swap-evidence-2026-08.md（撤回 DG0SNC，改用 Owen Duffy/MM0OPX/N1FD）`
-- [ ] Step 3: commit `docs(v3): 测试手册增设变换器验收红线章节`
+- [x] Step 1: `auto-efhw-tuner/docs/assembly_test_manual.md` 在 `> **关联文档**` 行之前插入 `## 10. 变换器台架验收（A/B 换装红线）`：P1/P2 步骤引用 `../../references/transformer_ab_protocol.md`；通过门表=裁决文档 §4 红线表原样（FT8/CW 3.5–7.3MHz ≤50W…）+ 复测周期（每年 §9 全频段扫描时复跑 P2 单科目）。
+- [x] Step 2: `auto-efhw-tuner/CHANGELOG.md` V3.0 节末追加：`### 2026-08-30 — Docs\n- 测试手册 §10 变换器 A/B 验收与功率红线；证据链 references/core-swap-evidence-2026-08.md（撤回 DG0SNC，改用 Owen Duffy/MM0OPX/N1FD）`
+- [x] Step 3: commit `docs(v3): 测试手册增设变换器验收红线章节`
 
 ### Task 7: 索引与勘误指针
 
-- [ ] Step 1: README:4 更新行 → `> 最后更新: 2026-08-30 (🆕 磁芯换装证据裁决 + A/B 实测协议入库)`
-- [ ] Step 2: README 知识图谱表（DMEGC 行附近）加两行：`**磁芯换装证据裁决 (3×51→2643251002)** 🆕 | BG1SB/Claude 研究组 | 2026-08-30 | references/core-swap-evidence-2026-08.md`、`**变换器 A/B 实测协议** 🆕 | BG1SB | 2026-08-30 | references/transformer_ab_protocol.md`
-- [ ] Step 3: `references/deep-dive-2026-05-25.md` 文首加一行：`> ⚠️ 2026-08-30：文中 "Mn-Zn" 类材料表述有误、"DG0SNC" 式效率叙事不适用——以 [[core-swap-evidence-2026-08]] 为准；43%/截面积推导保留。`
-- [ ] Step 4: commit `docs: 索引与勘误指针更新`
+- [x] Step 1: README:4 更新行 → `> 最后更新: 2026-08-30 (🆕 磁芯换装证据裁决 + A/B 实测协议入库)`
+- [x] Step 2: README 知识图谱表（DMEGC 行附近）加两行：`**磁芯换装证据裁决 (3×51→2643251002)** 🆕 | BG1SB/Claude 研究组 | 2026-08-30 | references/core-swap-evidence-2026-08.md`、`**变换器 A/B 实测协议** 🆕 | BG1SB | 2026-08-30 | references/transformer_ab_protocol.md`
+- [x] Step 3: `references/deep-dive-2026-05-25.md` 文首加一行：`> ⚠️ 2026-08-30：文中 "Mn-Zn" 类材料表述有误、"DG0SNC" 式效率叙事不适用——以 [[core-swap-evidence-2026-08]] 为准；43%/截面积推导保留。`
+- [x] Step 4: commit `docs: 索引与勘误指针更新`
 
 ### Task 8: 外部草稿归档 `references/external-drafts/`
 
-- [ ] Step 1: 建目录；两文件 `2026-08-swap-report-draft-1.md`、`2026-08-swap-report-draft-2.md`。头部批注块（固定文本）：
+- [x] Step 1: 建目录；两文件 `2026-08-swap-report-draft-1.md`、`2026-08-swap-report-draft-2.md`。头部批注块（固定文本）：
 
 ```markdown
 > 📦 外部生成草稿存档 — 未证实文本，保留原样仅供审计。
@@ -260,10 +260,10 @@ P5/P6：同栏自加。
 ```
 
   正文 = 两份报告原文逐字（**内联执行：取本会话用户消息原文**；若交子代理执行：由主控在派发前把原文粘入任务说明，禁止让执行者凭记忆复写）。尾部附"主张→裁决"两列摘要表（从裁决文档 §3/§2 摘行）。
-- [ ] Step 2: commit `docs: 归档两份外部报告草稿并挂批注`
+- [x] Step 2: commit `docs: 归档两份外部报告草稿并挂批注`
 
 ### Task 9: 终验（verification-before-completion）
 
-- [ ] Step 1: 跑规格 §7 三条：① grep Mn-Zn→43/31/61 零命中；② grep DG0SNC 仅出现在"撤回"上下文；③ 协议数据表列/单位/判据完整人工过目。
-- [ ] Step 2: URL 抽样 `curl -sI`：fair-rite 两页、squashpractice 三篇、n1fd 一篇 → 200/301；groups.io/docs.google 允许 403/302（记录"需登录"）。
-- [ ] Step 3: `git status` 干净、`git log --oneline -8` 核对 8 次提交；向用户汇报实测差异清单。
+- [x] Step 1: 跑规格 §7 三条：① grep Mn-Zn→43/31/61 零命中；② grep DG0SNC 仅出现在"撤回"上下文；③ 协议数据表列/单位/判据完整人工过目。
+- [x] Step 2: URL 抽样 `curl -sI`：fair-rite 两页、squashpractice 三篇、n1fd 一篇 → 200/301；groups.io/docs.google 允许 403/302（记录"需登录"）。
+- [x] Step 3: `git status` 干净、`git log --oneline -8` 核对 8 次提交；向用户汇报实测差异清单。
