@@ -1,14 +1,14 @@
 # EFHW (End-Fed Half-Wave) 天线知识库
 
 > BG1SB 的 EFHW 天线技术参考知识库
-> 最后更新: 2026-06-09 (🆕 V3.0 Fuchs ATU SDD 在线发布 → ybr387rz.mule.page)
+> 最后更新: 2026-08-30 (🆕 磁芯换装证据裁决 + A/B 实测协议入库 → `references/core-swap-evidence-2026-08.md`)
 
 ---
 
 ## 目录
 
 1. [EFHW 基本原理](#1-efhw-基本原理)
-2. [49:1 vs 64:1 变压器设计与选择](#2-491-vs-641-变压器设计与选择)
+2. [49:1 vs 64:1 变压器设计与选择（含实测证据链与 2643251002）](#2-491-vs-641-变压器设计与选择)
 3. [绕线方法 (含 W8JI 实测纠正)](#绕线方法)
 4. [共模扼流圈 (CMC) 应用](#3-共模扼流圈-cmc-应用)
 5. [平衡地线 (Counterpoise) 理论与实践](#4-平衡地线-counterpoise-理论与实践)
@@ -764,6 +764,8 @@ V3.0 从 STM32F103 + 继电器切换固定电容全面重构为 **ESP32-S3 + 伺
 | DIY 64:1 Linked EFHW | KM1NDY | 2022-08 | km1ndy.com |
 | EFHW 49:1 UNUN DIY | KM1NDY | 2022-02 | km1ndy.com |
 | **DMEGC Ni-Zn 磁环 EFHW 工程分析** 🆕 | **BG1SB / Hermes** | **2026-05-24** | **`references/dmegc_nizn_toroid.md`** |
+| **磁芯换装证据裁决 (3×51→2643251002)** 🆕 | **BG1SB / Claude 研究组** | **2026-08-30** | **`references/core-swap-evidence-2026-08.md`** |
+| **变换器 A/B 实测协议** 🆕 | **BG1SB** | **2026-08-30** | **`references/transformer_ab_protocol.md`** |
 | **🆕 The CFHW — EFHW vs Dipole for Portable Ops** | **VA3KOT (John)** | **2026-03-04** | **hamradiooutsidethebox.ca** |
 | **🆕 AA5TB Parallel L-C EFHW Coupler 实验** | **VA3KOT (John)** | **2026-02-04** | **hamradiooutsidethebox.ca** |
 | **🆕 100W 全自动谐振式 EFHW 调谐适配器 — 完整工程设计** | **BG1SB** | **2026-06-07** | **`references/auto_efhw_tuner_design_full.md`** |
