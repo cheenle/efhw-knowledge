@@ -669,7 +669,7 @@ V3.0 从 STM32F103 + 继电器切换固定电容全面重构为 **ESP32-S3 + 伺
 - SDD (源码): [`auto-efhw-tuner/docs/SDD.md`](auto-efhw-tuner/docs/SDD.md) (14章 IBM TeamSD)
 - FDE: [`auto-efhw-tuner/docs/FDE.md`](auto-efhw-tuner/docs/FDE.md) (19故障 FMEA)
 - BOM: [`auto-efhw-tuner/hardware/EFHW_TUNER_BOM_FUCHS.csv`](auto-efhw-tuner/hardware/EFHW_TUNER_BOM_FUCHS.csv)
-- MRRC集成: [`../atu_fuchs_handler.py`](../atu_fuchs_handler.py)
+- MRRC集成: [`../mrrc/atu_fuchs_handler.py`](../mrrc/atu_fuchs_handler.py)
 
 ### V2.0 → V3.0 核心变化
 
